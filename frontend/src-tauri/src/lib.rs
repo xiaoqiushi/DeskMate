@@ -7649,6 +7649,14 @@ async fn list_custom_codex_pets() -> Result<Vec<CodexPetMeta>, String> {
     Ok(out)
 }
 
+/// Forward a frontend diagnostic line to the dev terminal so debugging
+/// modal/blur/exit paths doesn't require opening webview DevTools.
+#[tauri::command]
+async fn debug_log(scope: String, msg: String) -> Result<(), String> {
+    log::info!("[fe:{}] {}", scope, msg);
+    Ok(())
+}
+
 /// Spawn a demo-mode mini mascot window. Each window runs the bundled
 /// frontend with `?demo=1&pet=<id>` query params, which routes to a
 /// minimal mascot-only React tree. Used by the dev-mode "演示模式" toggle
@@ -7793,8 +7801,40 @@ async fn close_demo_mascots(app: tauri::AppHandle) -> Result<u32, String> {
 /// the user cancelled. Implemented with `osascript` on macOS and
 /// PowerShell's `FolderBrowserDialog` on Windows so we don't need to add
 /// `tauri-plugin-dialog` just for this one flow.
+// macOS occasionally demotes our floating mini window back to the normal
+// NSWindow level after a foreign helper (osascript, NSOpenPanel-driven
+// pickers, etc.) takes focus. Re-apply level 27 (status) and reassert
+// always-on-top so the mascot/settings panel stays on top of everything.
+//
+// All AppKit work is dispatched to the main thread — calling NSWindow
+// methods from the Tauri command (runtime) thread trips AppKit's
+// main-thread assertions and aborts the app with SIGTERM.
+fn reassert_mini_floating(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let Some(win) = app.get_webview_window("mini") else {
+        return;
+    };
+    let win_clone = win.clone();
+    let _ = app.run_on_main_thread(move || {
+        #[cfg(target_os = "macos")]
+        {
+            use objc2::runtime::AnyObject;
+            use objc2::msg_send;
+            if let Ok(ns_win) = win_clone.ns_window() {
+                let obj = unsafe { &*(ns_win as *mut AnyObject) };
+                unsafe {
+                    let _: () = msg_send![obj, setLevel: 27isize];
+                    let behavior: usize = (1 << 0) | (1 << 4) | (1 << 8) | (1 << 6);
+                    let _: () = msg_send![obj, setCollectionBehavior: behavior];
+                }
+            }
+        }
+        let _ = win_clone.set_always_on_top(true);
+    });
+}
+
 #[tauri::command]
-async fn pick_codex_pet_folder() -> Result<Option<String>, String> {
+async fn pick_codex_pet_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     #[cfg(target_os = "macos")]
     {
         let script = "POSIX path of (choose folder with prompt \"选择 codex 宠物文件夹\")";
@@ -7802,6 +7842,12 @@ async fn pick_codex_pet_folder() -> Result<Option<String>, String> {
             .args(["-e", script])
             .output()
             .map_err(|e| e.to_string())?;
+        // Whether the user picked or cancelled, osascript briefly steals
+        // focus and the system can demote our floating mini window back to
+        // the normal NSWindow level. Re-apply level 27 (status) and
+        // reassert always-on-top so the settings panel doesn't visually
+        // sink under other apps.
+        reassert_mini_floating(&app);
         if !out.status.success() {
             // User cancelled — osascript exits non-zero. Treat as None.
             return Ok(None);
@@ -7826,6 +7872,7 @@ async fn pick_codex_pet_folder() -> Result<Option<String>, String> {
             .args(["-NoProfile", "-Command", script])
             .output()
             .map_err(|e| e.to_string())?;
+        reassert_mini_floating(&app);
         let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if path.is_empty() {
             Ok(None)
@@ -7835,6 +7882,7 @@ async fn pick_codex_pet_folder() -> Result<Option<String>, String> {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        let _ = app;
         Err("folder picker not implemented on this platform".into())
     }
 }
@@ -11612,7 +11660,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_status, send_chat, open_detail_panel, save_character_gif, delete_character_assets, delete_character_gif, get_agents, get_health, get_agent_metrics, interrupt_agent, scan_characters, get_agent_extra_info, open_mini, close_mini, set_mini_expanded, set_mini_size, set_efficiency_hover_tracking, resize_mini_height, move_mini_by, get_mini_origin, get_mini_monitor_rect, set_mini_origin, set_ime_mode, get_agent_sessions, get_session_preview, get_session_messages, get_active_sessions, proxy_post, play_sound, get_claude_sessions, get_claude_conversation, install_claude_hooks, install_cursor_hooks, remove_claude_session, resolve_claude_permission, get_claude_stats, open_url, activate_app, focus_cursor_terminal, check_ax_permission, request_ax_permission, jump_to_claude_terminal, check_for_update, run_update, close_ssh, read_local_file, list_backgrounds, save_background, get_background_data, exit_app, get_ssh_key_info, reset_ssh, get_ui_scale, list_custom_codex_pets, open_codex_pets_dir, import_codex_pet, pick_codex_pet_folder, spawn_demo_mascot, close_demo_mascot, close_demo_mascots, update_tray_language, set_pet_mode_window, set_pet_context_menu, set_pet_pomodoro_active, get_now_playing, get_system_idle_time])
+        .invoke_handler(tauri::generate_handler![get_status, send_chat, open_detail_panel, save_character_gif, delete_character_assets, delete_character_gif, get_agents, get_health, get_agent_metrics, interrupt_agent, scan_characters, get_agent_extra_info, open_mini, close_mini, set_mini_expanded, set_mini_size, set_efficiency_hover_tracking, resize_mini_height, move_mini_by, get_mini_origin, get_mini_monitor_rect, set_mini_origin, set_ime_mode, get_agent_sessions, get_session_preview, get_session_messages, get_active_sessions, proxy_post, play_sound, get_claude_sessions, get_claude_conversation, install_claude_hooks, install_cursor_hooks, remove_claude_session, resolve_claude_permission, get_claude_stats, open_url, activate_app, focus_cursor_terminal, check_ax_permission, request_ax_permission, jump_to_claude_terminal, check_for_update, run_update, close_ssh, read_local_file, list_backgrounds, save_background, get_background_data, exit_app, get_ssh_key_info, reset_ssh, get_ui_scale, list_custom_codex_pets, open_codex_pets_dir, import_codex_pet, pick_codex_pet_folder, spawn_demo_mascot, close_demo_mascot, close_demo_mascots, debug_log, update_tray_language, set_pet_mode_window, set_pet_context_menu, set_pet_pomodoro_active, get_now_playing, get_system_idle_time])
         .manage(ActiveAgentPid { pid: Mutex::new(None) })
         .manage(ClaudeState { sessions: Arc::new(Mutex::new(HashMap::new())), pending_permissions: Arc::new(Mutex::new(HashMap::new())) })
         .run(tauri::generate_context!())

@@ -131,11 +131,10 @@ export function PetPicker({
     } catch (e) {
       console.warn('[PetPicker] picker failed:', e)
     } finally {
-      // Hold the suppression for ~600ms after the dialog closes so the
-      // brief focus-bounce macOS does (dialog → webview → another app
-      // briefly → webview) cannot trigger a stray blur that would close
-      // the settings panel.
-      setTimeout(() => onNativeDialogEnd?.(), 600)
+      // Hold the suppression flag for ~1.5s after the dialog returns to
+      // cover macOS-synthesised clicks/blur events that arrive shortly
+      // after the OS hands focus back.
+      setTimeout(() => onNativeDialogEnd?.(), 1500)
     }
   }, [importing, loadAll, onNativeDialogStart, onNativeDialogEnd])
 

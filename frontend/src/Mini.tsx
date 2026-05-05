@@ -526,6 +526,7 @@ export default function Mini() {
   const [settingsMode, setSettingsMode] = useState(false)
   const settingsModeRef = useRef(false)
   const [showSettingsOverlay, setShowSettingsOverlay] = useState(false)
+  const [hiding, setHiding] = useState(false)
   const [settingsTransitioning, setSettingsTransitioning] = useState(false)
   const settingsTransitioningRef = useRef(false)
   const filePickerOpenRef = useRef(false)
@@ -605,7 +606,6 @@ export default function Mini() {
   }, [appMode, largeMascot])
 
 
-  const [hiding, setHiding] = useState(false)
   const [pinned, setPinned] = useState(false)
   const pinnedRef = useRef(false)
   const [viewMode, _setViewMode] = useState<'island' | 'efficiency'>('efficiency')
@@ -2874,6 +2874,15 @@ export default function Mini() {
 
   const collapse = useCallback(async () => {
     if (collapsingRef.current) return
+    // Defense in depth: while a native folder picker is in flight (or its
+    // post-close grace window is still active), don't tear down the
+    // expanded/settings UI underneath it.
+    if (nativeDialogActiveRef.current) return
+    // The enter/exit-settings transition resizes the native window which
+    // can momentarily steal focus → onBlur → collapse. Skip collapse
+    // while we're mid-transition so the UI we're building isn't torn
+    // down before it appears.
+    if (settingsTransitioningRef.current) return
     collapsingRef.current = true
     hoverExpandedRef.current = false
     setCompletionSessionId(null)
@@ -3135,6 +3144,12 @@ export default function Mini() {
       setSettingsMode(false)
       setSettingsNav('pairing')
       // Always return to collapsed visual state when leaving settings.
+      // Hide the collapsed mascot tree until the native window has been
+      // resized + repositioned. Without this guard React would render the
+      // collapsed mascot inside the still-large settings window, briefly
+      // showing it centred in the old (settings) frame before Rust snaps
+      // the window back — visually that looks like the mascot teleports.
+      setHiding(true)
       setShowPanel(false)
       setExpanded(false)
       expandedRef.current = false
@@ -3218,6 +3233,13 @@ export default function Mini() {
     const onBlur = () => {
       if (filePickerOpenRef.current) return
       if (nativeDialogActiveRef.current) return
+      // Resizing the native window via `set_mini_size` during the
+      // enter/exit-settings transition can momentarily steal focus from
+      // the webview. Without this guard, the resulting blur tears the
+      // half-built settings UI back down via `collapse()`, leaving the
+      // user staring at an empty mascot ("设置页出不来"). Skip blur while
+      // either transition is in flight.
+      if (settingsTransitioningRef.current) return
       // When settings is open, use the dedicated close path so pet mode
       // restores window geometry/state consistently.
       if (settingsModeRef.current) {
