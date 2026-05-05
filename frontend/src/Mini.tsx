@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { load } from '@tauri-apps/plugin-store'
-import { listen } from '@tauri-apps/api/event'
-import { ChevronDown, Loader2, X, Pin, Bell, BellOff, Move, Settings, Asterisk, Trash2, Cloud } from 'lucide-react'
+import { emit, listen } from '@tauri-apps/api/event'
+import { ChevronDown, Loader2, X, Pin, Bell, BellOff, Settings, Asterisk, Trash2, Cloud } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import ReactMarkdown from 'react-markdown'
 import { useTranslation } from 'react-i18next'
@@ -2657,31 +2657,50 @@ export default function Mini() {
         cancelFocusExpand()
         e.preventDefault()
         setMascotDragActive(true)
-        const startX = e.screenX
-        const startY = e.screenY
-        let lastX = e.screenX
-        let lastY = e.screenY
+        const startScreenX = e.screenX
+        const startScreenY = e.screenY
+        let lastScreenX = e.screenX
         let dragging = false
         const pid = e.pointerId
         const DRAG_THRESHOLD = 3
 
+        // Capture the window's logical origin once at pointerdown so we can
+        // drive the drag with absolute positioning. The previous `move_mini_by`
+        // path read `outer_position()` on every event, dividing by scale
+        // factor to convert physical→logical and then re-multiplying inside
+        // Tauri to set the new position. Repeated rounding plus the chance
+        // that a fast burst of events would read a stale (not-yet-applied)
+        // position made the window drift away from the cursor on high-DPI
+        // monitors. Absolute positioning side-steps both problems.
+        let originX = 0
+        let originY = 0
+        let originLoaded = false
+        invoke<[number, number]>('get_mini_origin')
+          .then(([x, y]) => {
+            originX = x
+            originY = y
+            originLoaded = true
+          })
+          .catch(() => {})
+
         const onMove = (ev: PointerEvent) => {
           if (ev.pointerId !== pid) return
+          const dxTotal = ev.screenX - startScreenX
+          const dyTotal = ev.screenY - startScreenY
           if (!dragging) {
-            if (Math.abs(ev.screenX - startX) + Math.abs(ev.screenY - startY) >= DRAG_THRESHOLD) {
+            if (Math.abs(dxTotal) + Math.abs(dyTotal) >= DRAG_THRESHOLD) {
               dragging = true
             } else {
               return
             }
           }
-          const dx = ev.screenX - lastX
-          const dy = ev.screenY - lastY
-          lastX = ev.screenX
-          lastY = ev.screenY
-          if (dx !== 0 || dy !== 0) {
-            invoke('move_mini_by', { dx, dy }).catch(() => {})
-            if (dx !== 0) updateWalkDir(dx > 0 ? 1 : -1)
-          }
+          if (!originLoaded) return
+          // confine=false so the user can drag the mascot across to a
+          // neighbouring monitor without hitting the per-monitor clamp.
+          invoke('set_mini_origin', { x: originX + dxTotal, y: originY + dyTotal, confine: false }).catch(() => {})
+          const dxStep = ev.screenX - lastScreenX
+          lastScreenX = ev.screenX
+          if (dxStep !== 0) updateWalkDir(dxStep > 0 ? 1 : -1)
         }
 
         const cleanup = () => {
@@ -2960,37 +2979,6 @@ export default function Mini() {
     [expand, updateWalkDir, cancelFocusExpand],
   )
 
-  const enterMoveMode = useCallback(async () => {
-    moveModeRef.current = true
-    setMascotDragActive(true)
-    // Immediately hide everything, skip the panel close animation so the
-    // user doesn't see a 350ms delay followed by a position jump.
-    setShowPanel(false)
-    setHiding(true)
-    setExpanded(false)
-    expandedRef.current = false
-    expandedWindowModeRef.current = null
-    try {
-      // Wait one frame so React unmounts the expanded tree before we
-      // resize the native window.
-      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-      await invoke('set_mini_expanded', {
-        expanded: false,
-        position: mascotPositionRef.current,
-        efficiency: viewModeRef.current === 'efficiency',
-        mascotScale: mascotScaleRef.current,
-        largeMascot: largeMascotRef.current,
-        largeMascotScale: largeMascotScaleRef.current,
-      })
-      await restoreCollapsedMascotPosition()
-    } catch {}
-    setMoveMode(true)
-    setHiding(false)
-    setTimeout(() => {
-      if (moveModeRef.current) setMascotDragActive(false)
-    }, 500)
-  }, [restoreCollapsedMascotPosition])
-
   const collapse = useCallback(async () => {
     if (collapsingRef.current) return
     // Defense in depth: while a native folder picker is in flight (or its
@@ -3054,6 +3042,14 @@ export default function Mini() {
       setExpanded(false)
       expandedRef.current = false
       expandedWindowModeRef.current = null
+      // Hide the entire document during the resize→reposition pair below.
+      // `set_mini_expanded(expanded:false)` first parks the window at the
+      // default collapsed slot (right-near-notch); only the follow-up
+      // set_mini_origin moves it to the saved customPos. Without this
+      // mask, both Windows DWM and macOS WindowServer keep compositing
+      // the in-flight frame, which the user sees as the mascot flashing
+      // at the notch position before snapping to its real spot.
+      document.documentElement.style.opacity = '0'
       try {
         await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
         if (wasSettings && appModeRef.current === 'pet' && largeMascotRef.current) {
@@ -3085,6 +3081,15 @@ export default function Mini() {
       // the mascot becomes visible again instead of getting stuck transparent.
       setHiding(false)
       setSettingsTransitioning(false)
+      // One more rAF after setHiding(false) so React commits the
+      // collapsed mascot tree at the new (correct) window geometry
+      // before we lift the document mask. Lifting too early flashes
+      // the empty webview through the transparent window.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.style.opacity = '1'
+        })
+      })
       // Brief cooldown to prevent focus event from immediately re-expanding
       setTimeout(() => {
         collapsingRef.current = false
@@ -3514,6 +3519,27 @@ export default function Mini() {
     : walkDir === -1
       ? 'run-left'
       : petStateToCodexState(mainPetState)
+  // Broadcast the resolved mascot state so dev-mode demo windows can
+  // mirror it. The main window owns the polling loops that derive
+  // working / waiting / idle (claude sessions every 2s, agents every
+  // 5s, health every 1s); demo windows have no business duplicating
+  // those polls. Emit on every change for low-latency mirroring, plus
+  // a 2s periodic re-emit so a freshly-spawned demo window catches
+  // the current state without waiting for the next change.
+  const mainPetStateRef = useRef<PetState>(mainPetState)
+  mainPetStateRef.current = mainPetState
+  useEffect(() => {
+    if (appMode !== 'coding') return
+    emit('mini-pet-state', { state: mainPetState }).catch(() => {})
+  }, [mainPetState, appMode])
+  useEffect(() => {
+    if (appMode !== 'coding') return
+    const t = setInterval(() => {
+      emit('mini-pet-state', { state: mainPetStateRef.current }).catch(() => {})
+    }, 2000)
+    return () => clearInterval(t)
+  }, [appMode])
+
   const fallbackLargeActions = useMemo(() => {
     const c = characters.find((ch) => ch.largeActions && Object.keys(ch.largeActions).length > 0)
     return c?.largeActions
@@ -3830,7 +3856,13 @@ export default function Mini() {
             display: (appMode === 'pet' && largeMascot) ? 'block' : 'flex',
             alignItems: (appMode === 'pet' && largeMascot) ? undefined : 'center',
             justifyContent: (appMode === 'pet' && largeMascot) ? undefined : 'center',
-            background: (viewMode === 'efficiency' && appMode !== 'pet') ? 'rgba(0,0,0,0.01)' : undefined,
+            // No background. Used to be `rgba(0,0,0,0.01)` to coax macOS
+            // WKWebView into delivering hover events on transparent area,
+            // but mini-panel no longer uses panel-level hover/click
+            // handlers (children carry their own), and the 1% alpha was
+            // visible on light-colored desktops as a faint gray tint
+            // around the mascot.
+            background: undefined,
             pointerEvents: 'auto',
             cursor: 'default',
           }}
@@ -4230,22 +4262,10 @@ export default function Mini() {
               </button>
             </div>
             <div className="flex items-center gap-4">
-              {/* Move-mode toggle is Windows-only. macOS supports direct
-                  drag from the collapsed mascot, so the explicit toggle is
-                  redundant there. Pet mode never shows this button. */}
-              {isWindowsPlatform && appMode !== 'pet' && (
-                <button
-                  data-no-drag
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    enterMoveMode()
-                  }}
-                  className="text-slate-400 hover:text-[#F0D140] transition-colors"
-                  title={t('mini.moveMascot')}
-                >
-                  <Move className="w-4 h-4" strokeWidth={2.5} />
-                </button>
-              )}
+              {/* Move-mode toggle has been retired on Windows now that the
+                  collapsed mascot supports direct drag-to-move. macOS never
+                  showed it (it has its own native drag path), and pet mode
+                  also never showed it. */}
               <button
                 data-no-drag
                 onClick={(e) => {
