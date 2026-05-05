@@ -619,6 +619,14 @@ export default function Mini() {
   const moveModeRef = useRef(false)
   const moveModeActivatedAtRef = useRef(0)
   const mascotDragActiveRef = useRef(false)
+  // Mirror of mascotDragActiveRef for React-driven UI (e.g. suppressing the
+  // sprite's hover-jump while dragging so walkDir → run-left/run-right
+  // actually shows). Keep both in sync via setMascotDragActive below.
+  const [mascotDragActive, _setMascotDragActive] = useState(false)
+  const setMascotDragActive = useCallback((v: boolean) => {
+    mascotDragActiveRef.current = v
+    _setMascotDragActive(v)
+  }, [])
   const setMoveMode = (v: boolean) => {
     moveModeRef.current = v
     if (v) moveModeActivatedAtRef.current = Date.now()
@@ -2537,7 +2545,7 @@ export default function Mini() {
           return
         }
         e.preventDefault()
-        mascotDragActiveRef.current = true
+        setMascotDragActive(true)
         const startX = e.screenX
         const startY = e.screenY
         let lastX = e.screenX
@@ -2566,7 +2574,7 @@ export default function Mini() {
         }
 
         const cleanup = () => {
-          mascotDragActiveRef.current = false
+          setMascotDragActive(false)
           updateWalkDir(0)
           window.removeEventListener('pointermove', onMove)
           window.removeEventListener('pointerup', onUp)
@@ -2649,7 +2657,7 @@ export default function Mini() {
       if (!isMoveMode && largeMascotRef.current && pomodoroRef.current?.active) return
       if (!isMoveMode && largeMascotRef.current) {
         e.preventDefault()
-        mascotDragActiveRef.current = true
+        setMascotDragActive(true)
         let lastX = e.screenX
         let lastY = e.screenY
         let dragging = false
@@ -2677,7 +2685,7 @@ export default function Mini() {
         }
 
         const cleanup = () => {
-          mascotDragActiveRef.current = false
+          setMascotDragActive(false)
           if (largePetActionRef.current === 'grasp') {
             setLargePetAction(null)
             largePetActionRef.current = null
@@ -2760,7 +2768,7 @@ export default function Mini() {
       // a native window move (which kills pointer capture and fires
       // lostpointercapture, aborting the first drag attempt).
       e.preventDefault()
-      mascotDragActiveRef.current = true
+      setMascotDragActive(true)
 
       let lastX = e.screenX
       let lastY = e.screenY
@@ -2793,7 +2801,7 @@ export default function Mini() {
       }
 
       const cleanup = () => {
-        mascotDragActiveRef.current = false
+        setMascotDragActive(false)
         updateWalkDir(0)
         if (largeMascotRef.current && largePetActionRef.current === 'grasp') {
           setLargePetAction(null)
@@ -2843,7 +2851,7 @@ export default function Mini() {
 
   const enterMoveMode = useCallback(async () => {
     moveModeRef.current = true
-    mascotDragActiveRef.current = true
+    setMascotDragActive(true)
     // Immediately hide everything, skip the panel close animation so the
     // user doesn't see a 350ms delay followed by a position jump.
     setShowPanel(false)
@@ -2868,7 +2876,7 @@ export default function Mini() {
     setMoveMode(true)
     setHiding(false)
     setTimeout(() => {
-      if (moveModeRef.current) mascotDragActiveRef.current = false
+      if (moveModeRef.current) setMascotDragActive(false)
     }, 500)
   }, [restoreCollapsedMascotPosition])
 
@@ -3799,6 +3807,7 @@ export default function Mini() {
                   enableHoverJump
                   externalHover={mascotHover}
                   useExternalHover={!isWindowsPlatform}
+                  suppressHover={mascotDragActive}
                 />
               </div>
             ) : (

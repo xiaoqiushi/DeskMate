@@ -20,6 +20,13 @@ interface MiniPetMascotProps {
   // keep firing during a drag (sprite would stay frozen on `jumping`).
   externalHover?: boolean
   useExternalHover?: boolean
+  // While true, hover is forced off so the wrapper never enters the
+  // `jumping` cycle. Used during a drag (Windows uses the webview-level
+  // `onMouseEnter`/`onMouseLeave`, which stay stuck on `enter` because the
+  // pointer never crosses the mascot border while the user is dragging
+  // it). Without this, walkDir → run-left/run-right is hidden by the
+  // continuous jump animation.
+  suppressHover?: boolean
   className?: string
   style?: React.CSSProperties
 }
@@ -36,6 +43,7 @@ export function MiniPetMascot({
   enableHoverJump = false,
   externalHover = false,
   useExternalHover = false,
+  suppressHover = false,
   className,
   style,
 }: MiniPetMascotProps) {
@@ -58,7 +66,9 @@ export function MiniPetMascot({
   }, [enableHoverJump, useExternalHover])
 
   const hovering =
-    enableHoverJump && (useExternalHover ? externalHover : internalHover)
+    enableHoverJump
+    && !suppressHover
+    && (useExternalHover ? externalHover : internalHover)
   hoveringRef.current = hovering
 
   useEffect(() => {
