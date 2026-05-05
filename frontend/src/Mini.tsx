@@ -3054,6 +3054,14 @@ export default function Mini() {
       setExpanded(false)
       expandedRef.current = false
       expandedWindowModeRef.current = null
+      // Hide the entire document during the resize→reposition pair below.
+      // `set_mini_expanded(expanded:false)` first parks the window at the
+      // default collapsed slot (right-near-notch); only the follow-up
+      // set_mini_origin moves it to the saved customPos. Without this
+      // mask, both Windows DWM and macOS WindowServer keep compositing
+      // the in-flight frame, which the user sees as the mascot flashing
+      // at the notch position before snapping to its real spot.
+      document.documentElement.style.opacity = '0'
       try {
         await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
         if (wasSettings && appModeRef.current === 'pet' && largeMascotRef.current) {
@@ -3085,6 +3093,15 @@ export default function Mini() {
       // the mascot becomes visible again instead of getting stuck transparent.
       setHiding(false)
       setSettingsTransitioning(false)
+      // One more rAF after setHiding(false) so React commits the
+      // collapsed mascot tree at the new (correct) window geometry
+      // before we lift the document mask. Lifting too early flashes
+      // the empty webview through the transparent window.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.style.opacity = '1'
+        })
+      })
       // Brief cooldown to prevent focus event from immediately re-expanding
       setTimeout(() => {
         collapsingRef.current = false
