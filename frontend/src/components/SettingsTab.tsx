@@ -234,7 +234,7 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
   const [hookStatus, setHookStatus] = useState('')
   const [enableCodex, setEnableCodex] = useState(!isWindowsPlatform)
   const [codexHookStatus, setCodexHookStatus] = useState('')
-  const [enableCursor, setEnableCursor] = useState(!isWindowsPlatform)
+  const [enableCursor, setEnableCursor] = useState(true)
   const [cursorHookStatus, setCursorHookStatus] = useState('')
   const [updateInfo, setUpdateInfo] = useState<{ current: string; latest: string; hasUpdate: boolean; url: string } | null>(null)
   const [updateChecking, setUpdateChecking] = useState(false)
@@ -297,11 +297,7 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
         await store.save()
       } else if (typeof cod === 'boolean') setEnableCodex(cod)
       const cur = await store.get('enable_cursor')
-      if (isWindowsPlatform) {
-        setEnableCursor(false)
-        await store.set('enable_cursor', false)
-        await store.save()
-      } else if (typeof cur === 'boolean') setEnableCursor(cur)
+      if (typeof cur === 'boolean') setEnableCursor(cur)
     })()
     void checkForUpdate()
     if (showIslandBackgroundSettings) {
@@ -610,8 +606,7 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
       </section>
 
       {!isWindowsPlatform && (
-      <>
-      {/* Codex */}
+      /* Codex (not yet supported on Windows) */
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-medium text-white">{t('settings.codex', 'Codex')}</h2>
         <div className="bg-[#0f0f0f] border border-white/5 rounded-2xl overflow-hidden">
@@ -625,6 +620,7 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
           </div>
         </div>
       </section>
+      )}
 
       {/* Cursor */}
       <section className="flex flex-col gap-4">
@@ -640,8 +636,6 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
           </div>
         </div>
       </section>
-      </>
-      )}
 
       {/* 显示设置 */}
       <section className="flex flex-col gap-4">
@@ -833,7 +827,6 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
             <Toggle checked={codexSoundEnabled} onChange={onToggleCodexSoundEnabled} />
           </div>
           )}
-          {!isWindowsPlatform && (
           <div className="flex items-center justify-between p-4 border-b border-white/5">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium text-white/90">{t('settings.cursorSound', 'Cursor Completion Sound')}</span>
@@ -841,7 +834,6 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
             </div>
             <Toggle checked={cursorSoundEnabled} onChange={onToggleCursorSoundEnabled} />
           </div>
-          )}
           <div className="flex items-center justify-between p-4 border-b border-white/5">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium text-white/90">{t('settings.waitingSound')}</span>

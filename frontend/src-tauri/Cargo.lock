@@ -2551,6 +2551,7 @@ dependencies = [
  "block2",
  "chrono",
  "dirs 5.0.1",
+ "encoding_rs",
  "libc",
  "log",
  "notify",

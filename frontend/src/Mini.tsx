@@ -483,7 +483,7 @@ export default function Mini() {
   // Feature toggles
   const [enableClaudeCode, setEnableClaudeCode] = useState(true)
   const [enableCodex, setEnableCodex] = useState(!isWindowsPlatform)
-  const [enableCursor, setEnableCursor] = useState(!isWindowsPlatform)
+  const [enableCursor, setEnableCursor] = useState(true)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [codexSoundEnabled, setCodexSoundEnabled] = useState(true)
   const [cursorSoundEnabled, setCursorSoundEnabled] = useState(false)
@@ -2016,12 +2016,12 @@ export default function Mini() {
       setEnableCodex(codEnabled)
       if (cc !== false || codEnabled) invoke('install_claude_hooks').catch(() => {})
       const cur = await store.get('enable_cursor')
-      const curEnabled = isWindowsPlatform ? false : cur !== false
+      const curEnabled = cur !== false
       setEnableCursor(curEnabled)
       if (curEnabled) invoke('install_cursor_hooks').catch(() => {})
       if (isWindowsPlatform) {
+        // Codex is not yet supported on Windows; keep it forced off.
         await store.set('enable_codex', false)
-        await store.set('enable_cursor', false)
         await store.save()
       }
       const snd = await store.get('sound_enabled')
@@ -3030,7 +3030,7 @@ export default function Mini() {
           const cod = await store.get('enable_codex')
           setEnableCodex(isWindowsPlatform ? false : cod !== false)
           const cur = await store.get('enable_cursor')
-          setEnableCursor(isWindowsPlatform ? false : cur !== false)
+          setEnableCursor(cur !== false)
         } catch {}
         // Trigger immediate refresh so config changes are reflected right away.
         fetchAgents()
@@ -3326,7 +3326,7 @@ export default function Mini() {
         const cod = await store.get('enable_codex')
         setEnableCodex(isWindowsPlatform ? false : cod !== false)
         const cur = await store.get('enable_cursor')
-        setEnableCursor(isWindowsPlatform ? false : cur !== false)
+        setEnableCursor(cur !== false)
         fetchAgents()
         try {
           await invoke('set_mini_size', {
