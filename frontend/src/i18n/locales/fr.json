@@ -145,6 +145,11 @@
     "autoExpandOnTask": "Popup automatique",
     "autoExpandOnTaskDesc": "Développer automatiquement le panneau lorsqu'une tâche se termine ou nécessite une saisie",
 
+    "system": "Système",
+    "autostart": "Lancer à la connexion",
+    "autostartDesc": "Démarrer oc-claw automatiquement à votre connexion",
+    "autostartFailed": "Échec de la mise à jour du démarrage automatique :",
+
     "about": "À propos",
     "currentVersion": "Version actuelle",
     "latest": "Dernière",

@@ -11814,6 +11814,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
+        // Autostart: enabled via the settings toggle. We pass
+        // `--launched-at-login` so future code can detect login-launches and
+        // skip noisy first-run UI if needed.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--launched-at-login"]),
+        ))
         .register_uri_scheme_protocol("localasset", |ctx, req| {
             let raw_path = req.uri().path();
             let path = percent_decode_str(raw_path).decode_utf8_lossy();

@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import {
+  enable as enableAutostartCmd,
+  disable as disableAutostartCmd,
+  isEnabled as isAutostartEnabled,
+} from '@tauri-apps/plugin-autostart'
 import { Loader2, Check, ChevronDown, Copy, Plus, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
@@ -236,6 +241,8 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
   const [codexHookStatus, setCodexHookStatus] = useState('')
   const [enableCursor, setEnableCursor] = useState(true)
   const [cursorHookStatus, setCursorHookStatus] = useState('')
+  const [enableAutostart, setEnableAutostart] = useState(false)
+  const [autostartStatus, setAutostartStatus] = useState('')
   const [updateInfo, setUpdateInfo] = useState<{ current: string; latest: string; hasUpdate: boolean; url: string } | null>(null)
   const [updateChecking, setUpdateChecking] = useState(false)
   const [updateCheckResult, setUpdateCheckResult] = useState<'success' | 'error' | null>(null)
@@ -298,6 +305,18 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
       } else if (typeof cod === 'boolean') setEnableCodex(cod)
       const cur = await store.get('enable_cursor')
       if (typeof cur === 'boolean') setEnableCursor(cur)
+      // Reconcile autostart toggle with the system: the OS-level registration
+      // (registry on Windows, LaunchAgent on macOS) is the source of truth in
+      // case the user disabled it externally; mirror that into our store so
+      // the UI never lies about the current state.
+      try {
+        const sysEnabled = await isAutostartEnabled()
+        setEnableAutostart(sysEnabled)
+        await store.set('enable_autostart', sysEnabled)
+        await store.save()
+      } catch {
+        // ignore — toggle stays at default false if the plugin can't report
+      }
     })()
     void checkForUpdate()
     if (showIslandBackgroundSettings) {
@@ -449,6 +468,21 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
       } catch (e: any) {
         setCodexHookStatus(`${t('settings.hookFailed')} ${String(e)}`)
       }
+    }
+  }
+
+  const toggleAutostart = async (val: boolean) => {
+    setEnableAutostart(val)
+    setAutostartStatus('')
+    try {
+      if (val) await enableAutostartCmd()
+      else await disableAutostartCmd()
+      const store = await getStore()
+      await store.set('enable_autostart', val)
+      await store.save()
+    } catch (e: any) {
+      setEnableAutostart(!val)
+      setAutostartStatus(`${t('settings.autostartFailed', 'Failed to update autostart')} ${String(e)}`)
     }
   }
 
@@ -852,6 +886,21 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
       </section>
 
       </>}
+      {/* 系统 */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-medium text-white">{t('settings.system', 'System')}</h2>
+        <div className="bg-[#0f0f0f] border border-white/5 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-white/90">{t('settings.autostart', 'Launch on Login')}</span>
+              <span className="text-xs text-white/40">{t('settings.autostartDesc', 'Start oc-claw automatically when you log in')}</span>
+              {autostartStatus && <span className="text-xs text-red-400 mt-1 break-all">{autostartStatus}</span>}
+            </div>
+            <Toggle checked={enableAutostart} onChange={toggleAutostart} />
+          </div>
+        </div>
+      </section>
+
       {/* 关于 */}
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-medium text-white">{t('settings.about')}</h2>

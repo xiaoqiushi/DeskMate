@@ -145,6 +145,11 @@
     "autoExpandOnTask": "Popup automático",
     "autoExpandOnTaskDesc": "Expandir el panel automáticamente cuando una tarea se completa o necesita entrada",
 
+    "system": "Sistema",
+    "autostart": "Iniciar al iniciar sesión",
+    "autostartDesc": "Iniciar oc-claw automáticamente al iniciar sesión",
+    "autostartFailed": "Error al actualizar el inicio automático:",
+
     "about": "Acerca de",
     "currentVersion": "Versión actual",
     "latest": "Última",
