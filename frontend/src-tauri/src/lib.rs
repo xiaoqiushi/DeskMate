@@ -10691,40 +10691,31 @@ fn codex_requires_escalation(event: &serde_json::Value) -> bool {
         return false;
     }
 
-    // Preferred path: explicit approval/escalation fields.
+    // Only trust explicit approval/escalation fields that Codex itself sets
+    // on the event or inside tool_input. Anything beyond that is a guess.
+    //
+    // The previous fallback inspected the bash command string and flagged
+    // anything containing `/Users/`, `$HOME/`, `Desktop/` or a redirect
+    // operator as needing approval. That heuristic was meant to catch
+    // out-of-workspace writes in `default` permission mode, but on macOS
+    // virtually every read command (`sed -n '/Users/...'`, `ls /Users/...`,
+    // `cat /Users/...`) tripped it. Skills like hatch-pet that live under
+    // `~/.codex/skills/` would fire `is_wait_event` on every Bash tool call
+    // and play the waiting sound dozens of times per task.
+    //
+    // Codex already owns the real permission flow: when approval is
+    // actually required it fires a separate `PermissionRequest` hook event,
+    // which `is_wait_event` picks up via its `hook_event == "PermissionRequest"`
+    // branch. We don't need to second-guess based on command shape.
     if has_explicit_escalation_markers(event) {
         return true;
     }
-    let parsed_tool_input = parse_tool_input(event);
-    if let Some(tool_input) = parsed_tool_input.as_ref() {
-        if has_explicit_escalation_markers(tool_input) {
+    if let Some(tool_input) = parse_tool_input(event) {
+        if has_explicit_escalation_markers(&tool_input) {
             return true;
         }
     }
-
-    // Fallback for Codex payloads that omit explicit flags:
-    // PreToolUse(Bash) in default permission mode with an obvious
-    // out-of-workspace write command almost always means approval UI.
-    let tool_name = read_string(event, &["tool", "tool_name"]).unwrap_or("");
-    let permission_mode = read_string(event, &["permission_mode", "permissionMode"]).unwrap_or("");
-    if !(tool_name == "Bash" && permission_mode == "default") {
-        return false;
-    }
-
-    let command = parsed_tool_input
-        .as_ref()
-        .and_then(|ti| read_string(ti, &["command"]))
-        .unwrap_or("");
-    if command.is_empty() {
-        return false;
-    }
-    command.contains("$HOME/")
-        || command.contains("/Users/")
-        || command.contains("Desktop/")
-        || command.contains(" cat > ")
-        || command.contains(" > ")
-        || command.contains("<<'EOF'")
-        || command.contains("<<EOF")
+    false
 }
 
 fn is_codex_internal_utility_event(event: &serde_json::Value) -> bool {
