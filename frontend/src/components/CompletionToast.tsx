@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { CheckCircle2, ExternalLink, FolderOpen, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ExternalLink, FolderOpen, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { SpritePet } from './SpritePet'
 import type { CodexPet } from '../lib/codexPet'
@@ -15,6 +15,7 @@ interface CompletionToastPayload {
   lastResponse?: string
   updatedAt?: number
   autoClose?: boolean
+  status?: 'completed' | 'waiting' | 'failed'
   pet?: CodexPet | null
 }
 
@@ -45,6 +46,8 @@ function responseText(payload: CompletionToastPayload) {
   const raw = (payload.lastResponse || '').trim()
   if (raw && raw !== '✓') return raw
   const label = sourceLabel(payload.source)
+  if (payload.status === 'waiting') return `${label} 正在等待输入或权限确认。点击查看编辑器窗口。`
+  if (payload.status === 'failed') return `${label} 任务结束时出现异常。点击查看编辑器窗口。`
   return `${label} 已完成任务。点击查看编辑器窗口。`
 }
 
@@ -118,6 +121,16 @@ export function CompletionToast() {
 
   const label = sourceLabel(payload.source)
   const hasProject = !!payload.cwd
+  const status = payload.status || 'completed'
+  const isWaiting = status === 'waiting'
+  const isFailed = status === 'failed'
+  const statusText = isWaiting ? '等待' : isFailed ? '异常' : '完成'
+  const StatusIcon = isWaiting || isFailed ? AlertCircle : CheckCircle2
+  const statusClass = isWaiting
+    ? 'text-amber-300'
+    : isFailed
+      ? 'text-red-300'
+      : 'text-emerald-400'
 
   return (
     <div className="w-full h-full p-2">
@@ -157,9 +170,9 @@ export function CompletionToast() {
               </div>
               <div className="mt-2 flex min-w-0 items-center gap-2">
                 <span className={`shrink-0 rounded-md px-2 py-0.5 text-[12px] font-semibold ${sourceClass(payload.source)}`}>{label}</span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-[12px] text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  完成
+                <span className={`inline-flex shrink-0 items-center gap-1 text-[12px] ${statusClass}`}>
+                  <StatusIcon className="h-3.5 w-3.5" />
+                  {statusText}
                 </span>
                 <span className="shrink-0 text-[12px] text-slate-600">{timeAgo(payload.updatedAt)}</span>
               </div>

@@ -507,6 +507,7 @@ export default function Mini() {
         lastResponse: session.lastResponse || '',
         updatedAt: session.updatedAt || Date.now(),
         autoClose: autoCloseCompletionRef.current,
+        status: session.toastStatus || (session.status === 'waiting' ? 'waiting' : session.status === 'failed' ? 'failed' : 'completed'),
         pet: toastPet,
       },
     }).catch((err: unknown) => console.warn('show completion toast failed:', err))
@@ -548,9 +549,6 @@ export default function Mini() {
   const [panelMaxHeight, setPanelMaxHeight] = useState(300)
   const panelMaxHeightRef = useRef(300)
   panelMaxHeightRef.current = panelMaxHeight
-  const [hoverDelay, setHoverDelay] = useState(0.2)
-  const hoverDelayRef = useRef(0.2)
-  hoverDelayRef.current = hoverDelay
   const [mascotScale, setMascotScale] = useState(1)
   const mascotScaleRef = useRef(1)
   mascotScaleRef.current = mascotScale
@@ -721,10 +719,8 @@ export default function Mini() {
     mascotDragActiveRef.current = v
     _setMascotDragActive(v)
   }, [])
-  // Pending focus-driven auto-expand timer. The Windows window-focus
-  // listener defers expand() into this timer so a click landing on the
-  // mascot can cancel it and let handleMascotPointerDown decide between
-  // drag and expand instead.
+  // Legacy focus-driven expand timer. Keep the cancellation path so stale
+  // timers from hot reloads or older windows cannot open the panel later.
   const focusExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelFocusExpand = useCallback(() => {
     if (focusExpandTimerRef.current) {
@@ -2108,11 +2104,6 @@ export default function Mini() {
       }
       const pmh = await store.get('panel_max_height')
       if (typeof pmh === 'number' && pmh >= 200 && pmh <= 500) setPanelMaxHeight(pmh)
-      const hd = await store.get('hover_delay')
-      if (typeof hd === 'number' && hd >= 0 && hd <= 2) {
-        setHoverDelay(hd)
-        hoverDelayRef.current = hd
-      }
       const ms = await store.get('mascot_scale')
       if (typeof ms === 'number') {
         const nextMascotScale = clampMascotScale(ms)
@@ -2145,7 +2136,7 @@ export default function Mini() {
       setClaudeSessions([])
       return
     }
-    // Track which sessions already had lastResponse so we only auto-expand once.
+    // Track which sessions already had lastResponse so we only notify once.
     const seenCompletions = new Set<string>()
     // Track previously logged session statuses so we only emit a backend log
     // line when something actually changes — keeps DeskMate.log readable.
@@ -2191,16 +2182,16 @@ export default function Mini() {
         }
         // In efficiency mode, notify when a session just completed with an
         // AI response (lastResponse appeared for the first time). Completion
-        // no longer auto-expands the top panel; it records the detail for
-        // manual viewing and shows a separate top-right toast instead.
+        // never auto-expands the top panel; it only shows the separate
+        // top-right toast when enabled.
         for (const s of sessions) {
           if (s.lastResponse && s.status === 'stopped' && !seenCompletions.has(s.sessionId)) {
             seenCompletions.add(s.sessionId)
-            // Only notify if tab not active and panel is collapsed
+            // Notify only while the top panel is collapsed; the toast itself
+            // is non-intrusive and does not steal the user's active window.
             if (
               autoExpandOnTaskRef.current &&
               !updateModalOpenRef.current &&
-              !s.isActiveTab &&
               viewModeRef.current === 'efficiency' &&
               !expandedRef.current &&
               !expandingRef.current &&
@@ -2258,12 +2249,30 @@ export default function Mini() {
       const isClaudeDesktop = !isCursor && !isCodex && hostTerminal === 'Claude Desktop'
       const isClaudeCli = !isCursor && !isCodex && !isClaudeDesktop
       // Drop the event entirely if the matching listener toggle is off, so
-      // muted streams never trigger auto-expand or completion popups either.
+      // muted streams never trigger completion popups either.
       if (isClaudeDesktop && !enableClaudeDesktopRef.current) return
       if (isClaudeCli && !enableClaudeCodeRef.current) return
       // Waiting/permission events must not auto-open the top panel. The
       // permission card remains available when the user opens the panel
       // manually, but background work should not interrupt the current app.
+      if (
+        ev.payload?.waiting &&
+        autoExpandOnTaskRef.current &&
+        viewModeRef.current === 'efficiency' &&
+        !expandedRef.current &&
+        !expandingRef.current &&
+        !collapsingRef.current
+      ) {
+        const toastSession = currentSession || {
+          sessionId: ev.payload?.sessionId,
+          source: ev.payload?.source,
+          cwd: ev.payload?.cwd,
+          userPrompt: ev.payload?.userPrompt,
+          lastResponse: '等待用户输入或权限确认。',
+          updatedAt: Date.now(),
+        }
+        showCompletionToast({ ...toastSession, toastStatus: 'waiting', lastResponse: toastSession.lastResponse || '等待用户输入或权限确认。' })
+      }
       const shouldSound = isCursor ? cursorSoundEnabledRef.current : isCodex ? codexSoundEnabledRef.current : soundEnabledRef.current
       if (!shouldSound) return
       if (ev.payload?.waiting && !waitingSoundRef.current) return
@@ -2400,10 +2409,9 @@ export default function Mini() {
   const sessionSlots = [...ocSlots, ...claudeSlots].slice(0, MAX_SLOTS)
 
   const expandingRef = useRef(false)
-  const expandFnRef = useRef<(() => void) | null>(null)
   const hoverExpandedRef = useRef(false)
-  // Track which session triggered auto-expand on completion, so we can
-  // show only that session's completion popup and collapse the rest.
+  // Track which session is highlighted after completion, so the expanded
+  // panel can show only that session's completion detail and collapse the rest.
   // State drives re-render; ref allows reads from async callbacks.
   const [completionSessionId, _setCompletionSessionId] = useState<string | null>(null)
   const completionSessionIdRef = useRef<string | null>(null)
@@ -2473,7 +2481,6 @@ export default function Mini() {
       expandingRef.current = false
     }
   }, [syncExpandedWindowLayout])
-  expandFnRef.current = expand
   const updateModalWindowAdjustedRef = useRef(false)
   const updateModalPrevExpandedRef = useRef(false)
 
@@ -2742,20 +2749,18 @@ export default function Mini() {
       // sprite via updateWalkDir so the pet visibly runs while moving.
       if (!moveModeRef.current && appModeRef.current !== 'pet') {
         if (e.button !== 0 || e.ctrlKey || collapsingRef.current) return
-        // On macOS the cursor poll in lib.rs (efficiency_hover_poll) drives
-        // the drag itself via translate_mini_frame + mini-mascot-walk events.
-        // Letting the webview path also call move_mini_by would double the
-        // motion, so swallow the pointerdown here and rely on the Rust
-        // poll for translation + walk-dir + persistence.
+        // On macOS the panel is opened explicitly by clicking the mascot.
+        // Automatic notch-hover expansion is disabled so background task
+        // updates never steal attention.
         if (!isWindowsPlatform) {
           e.preventDefault()
+          hoverExpandedRef.current = false
+          setCompletionSessionId(null)
+          expand()
           return
         }
-        // The window-focus auto-expand fires slightly before pointerdown
-        // when clicking an unfocused mini window. Cancel it so this click
-        // path is the single source of truth for expand vs drag —
-        // otherwise a quick wiggle ends up dragging the auto-expanded
-        // panel.
+        // Cancel any stale focus-open timer so click/drag remains the single
+        // source of truth for opening the panel.
         cancelFocusExpand()
         e.preventDefault()
         setMascotDragActive(true)
@@ -2822,9 +2827,8 @@ export default function Mini() {
           if (ev.pointerId !== pid) return
           cleanup()
           if (!dragging) {
-            // macOS opens the panel via notch hover (efficiency_hover_poll),
-            // so a tap on the mascot stays a no-op there. Windows has no
-            // notch detection, so a tap is the only way to open the panel.
+            // Windows click opens the panel; macOS is handled immediately on
+            // pointerdown above to keep it as an explicit manual trigger.
             if (isWindowsPlatform) {
               hoverExpandedRef.current = false
               setCompletionSessionId(null)
@@ -3290,21 +3294,8 @@ export default function Mini() {
           clearTimeout(hoverCloseTimerRef.current)
           hoverCloseTimerRef.current = null
         }
-        if (!expandedRef.current && !collapsingRef.current && !expandingRef.current && !moveModeRef.current && !hoverOpenTimerRef.current) {
-          const delayMs = Math.round(hoverDelayRef.current * 1000)
-          if (delayMs <= 0) {
-            hoverExpandedRef.current = true
-            expandFnRef.current?.()
-          } else {
-            hoverOpenTimerRef.current = setTimeout(() => {
-              hoverOpenTimerRef.current = null
-              if (!expandedRef.current && !collapsingRef.current && !expandingRef.current && !moveModeRef.current) {
-                hoverExpandedRef.current = true
-                expandFnRef.current?.()
-              }
-            }, delayMs)
-          }
-        }
+        // Hover no longer opens the top panel automatically. The panel is
+        // still available through the explicit mascot click/manual trigger.
       } else {
         if (hoverOpenTimerRef.current) {
           clearTimeout(hoverOpenTimerRef.current)
@@ -3550,38 +3541,8 @@ export default function Mini() {
   }, [expanded, pinned, settingsMode, updateModalOpen, collapse, exitSettings, debugToTerminal, isSettingsPickerBlockingClose])
 
   useEffect(() => {
-    if (expanded || moveMode || updateModalOpen) return
-    // Auto-expand on window focus is Windows-only. macOS opens the panel
-    // through the notch-hover poll, and clicking the mascot will focus the
-    // mini window — auto-expanding here would re-introduce the popup that
-    // we explicitly suppressed in the pointerdown handler.
-    if (!isWindowsPlatform) return
-    const onFocus = () => {
-      if (appModeRef.current === 'pet') return // no auto-expand in pet mode
-      if (collapsingRef.current || moveModeRef.current || mascotDragActiveRef.current) return
-      // Large mascot uses long-press to expand; auto-expand on focus
-      // would race with the pointerdown handler and steal the click.
-      if (largeMascotRef.current) return
-      // Defer expand by one tick so a pointerdown landing on the mascot
-      // can cancel it. Without this delay, clicking an unfocused mini
-      // window fires `focus` before `pointerdown`; the focus path opens
-      // the panel while the pointerdown path simultaneously starts the
-      // drag flow, dragging the freshly-opened panel along with the
-      // window. Cancellation lives in handleMascotPointerDown.
-      cancelFocusExpand()
-      focusExpandTimerRef.current = setTimeout(() => {
-        focusExpandTimerRef.current = null
-        if (collapsingRef.current || moveModeRef.current || mascotDragActiveRef.current) return
-        if (largeMascotRef.current) return
-        expand()
-      }, 80)
-    }
-    window.addEventListener('focus', onFocus)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      cancelFocusExpand()
-    }
-  }, [expanded, expand, moveMode, updateModalOpen, cancelFocusExpand])
+    cancelFocusExpand()
+  }, [cancelFocusExpand])
 
   // Exit move mode when clicking outside mascot or when window loses focus.
   // Use a debounced blur so that programmatic window moves (which briefly
@@ -5833,14 +5794,6 @@ export default function Mini() {
                           setPanelMaxHeight(v)
                           const store = await getStore()
                           await store.set('panel_max_height', v)
-                          await store.save()
-                        }}
-                        hoverDelay={hoverDelay}
-                        onChangeHoverDelay={async (v) => {
-                          setHoverDelay(v)
-                          hoverDelayRef.current = v
-                          const store = await getStore()
-                          await store.set('hover_delay', v)
                           await store.save()
                         }}
                         largeMascotScale={largeMascotScale}

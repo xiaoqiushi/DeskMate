@@ -6622,6 +6622,8 @@ struct CompletionToastPayload {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     auto_close: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pet: Option<serde_json::Value>,
 }
 

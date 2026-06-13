@@ -231,7 +231,7 @@ function ConnectionRow({ conn, onUpdate, onDelete, disableLocal }: { conn: OcCon
   )
 }
 
-export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, onToggleWaitingSound, soundEnabled, onToggleSoundEnabled, codexSoundEnabled, onToggleCodexSoundEnabled, cursorSoundEnabled, onToggleCursorSoundEnabled, autoCloseCompletion, onToggleAutoCloseCompletion, autoExpandOnTask, onToggleAutoExpandOnTask, islandBg, onChangeIslandBg, bgPos, onChangeBgPos, panelMaxHeight, onChangePanelMaxHeight, hoverDelay, onChangeHoverDelay, largeMascotScale, onChangeLargeMascotScale, appMode, onChangeAppMode, petSfxEnabled, onTogglePetSfxEnabled, petIdleIntervalMin, onChangePetIdleIntervalMin }: { notifySound: 'default' | 'manbo'; onChangeNotifySound: (v: 'default' | 'manbo') => void; waitingSound: boolean; onToggleWaitingSound: (v: boolean) => void; soundEnabled: boolean; onToggleSoundEnabled: (v: boolean) => void; codexSoundEnabled: boolean; onToggleCodexSoundEnabled: (v: boolean) => void; cursorSoundEnabled: boolean; onToggleCursorSoundEnabled: (v: boolean) => void; autoCloseCompletion: boolean; onToggleAutoCloseCompletion: (v: boolean) => void; autoExpandOnTask: boolean; onToggleAutoExpandOnTask: (v: boolean) => void; islandBg: string; onChangeIslandBg: (v: string) => void; bgPos: { x: number; y: number }; onChangeBgPos: (v: { x: number; y: number }) => void; panelMaxHeight: number; onChangePanelMaxHeight: (v: number) => void; hoverDelay: number; onChangeHoverDelay: (v: number) => void; largeMascotScale: number; onChangeLargeMascotScale: (v: number) => void; appMode?: 'coding' | 'pet' | null; onChangeAppMode?: (v: 'coding' | 'pet') => void; petSfxEnabled?: boolean; onTogglePetSfxEnabled?: (v: boolean) => void; petIdleIntervalMin?: number; onChangePetIdleIntervalMin?: (v: number) => void }) {
+export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, onToggleWaitingSound, soundEnabled, onToggleSoundEnabled, codexSoundEnabled, onToggleCodexSoundEnabled, cursorSoundEnabled, onToggleCursorSoundEnabled, autoCloseCompletion, onToggleAutoCloseCompletion, autoExpandOnTask, onToggleAutoExpandOnTask, islandBg, onChangeIslandBg, bgPos, onChangeBgPos, panelMaxHeight, onChangePanelMaxHeight, largeMascotScale, onChangeLargeMascotScale, appMode, onChangeAppMode, petSfxEnabled, onTogglePetSfxEnabled, petIdleIntervalMin, onChangePetIdleIntervalMin }: { notifySound: 'default' | 'manbo'; onChangeNotifySound: (v: 'default' | 'manbo') => void; waitingSound: boolean; onToggleWaitingSound: (v: boolean) => void; soundEnabled: boolean; onToggleSoundEnabled: (v: boolean) => void; codexSoundEnabled: boolean; onToggleCodexSoundEnabled: (v: boolean) => void; cursorSoundEnabled: boolean; onToggleCursorSoundEnabled: (v: boolean) => void; autoCloseCompletion: boolean; onToggleAutoCloseCompletion: (v: boolean) => void; autoExpandOnTask: boolean; onToggleAutoExpandOnTask: (v: boolean) => void; islandBg: string; onChangeIslandBg: (v: string) => void; bgPos: { x: number; y: number }; onChangeBgPos: (v: { x: number; y: number }) => void; panelMaxHeight: number; onChangePanelMaxHeight: (v: number) => void; largeMascotScale: number; onChangeLargeMascotScale: (v: number) => void; appMode?: 'coding' | 'pet' | null; onChangeAppMode?: (v: 'coding' | 'pet') => void; petSfxEnabled?: boolean; onTogglePetSfxEnabled?: (v: boolean) => void; petIdleIntervalMin?: number; onChangePetIdleIntervalMin?: (v: number) => void }) {
   const { t, i18n } = useTranslation()
   const isWindowsPlatform = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
   const [connections, setConnections] = useState<OcConnection[]>([])
@@ -708,8 +708,8 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
         <div className="bg-[#0f0f0f] border border-white/5 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-white/5">
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-white/90">{t('settings.autoExpandOnTask', 'Auto Popup')}</span>
-              <span className="text-xs text-white/40">{t('settings.autoExpandOnTaskDesc', 'Automatically expand panel when a task completes or needs input')}</span>
+              <span className="text-sm font-medium text-white/90">{t('settings.autoExpandOnTask', 'Completion Toast')}</span>
+              <span className="text-xs text-white/40">{t('settings.autoExpandOnTaskDesc', 'Show a top-right toast when a task completes or needs input')}</span>
             </div>
             <Toggle checked={autoExpandOnTask} onChange={onToggleAutoExpandOnTask} />
           </div>
@@ -728,24 +728,6 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
               step={10}
               value={panelMaxHeight}
               onChange={(e) => onChangePanelMaxHeight(Number(e.target.value))}
-              className="w-full accent-white/60 h-1"
-            />
-          </div>
-          <div className={`p-4 ${showIslandBackgroundSettings ? 'border-b border-white/5' : ''}`}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium text-white/90">{t('settings.hoverDelay', 'Hover Trigger Delay')}</span>
-                <span className="text-xs text-white/40">{t('settings.hoverDelayDesc', 'Delay before expanding panel on hover')}</span>
-              </div>
-              <span className="text-sm text-white/60 tabular-nums">{hoverDelay.toFixed(1)}s</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.1}
-              value={hoverDelay}
-              onChange={(e) => onChangeHoverDelay(Number(e.target.value))}
               className="w-full accent-white/60 h-1"
             />
           </div>
