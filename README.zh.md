@@ -6,7 +6,7 @@
   <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/下载-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
-  <a href="./README.md">English</a> | <b>中文</b> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
+  <a href="./README.en.md">English</a> | <b>中文</b> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
 </p>
 <p align="center">
   面向 AI 编程 agent 的桌面伙伴：监控任务状态、低打扰提示完成结果，并跳转回对应的编辑器窗口或 Codex 线程。
@@ -15,6 +15,19 @@
 > DeskMate 是基于原项目 [OC-Claw](https://github.com/rainnoon/oc-claw)
 > 的独立二次开发版本。当前分支保留原项目的桌宠与 agent 监控基础，并继续进行
 > DeskMate 品牌、任务完成提示、编辑器跳转和工作流体验等方向的改造。
+
+## 二开重点优化
+
+DeskMate 不是简单改名，而是在原项目基础上重点优化了“任务完成后如何回到正确现场”的体验：
+
+- **右上角完成提示**：任务结束后改为右上角轻提示，展示任务、项目、回复摘要等信息，不再自动弹出正上方面板打断当前操作。
+- **点击跳回对应编辑器**：完成提示和会话列表优先跳回对应编辑器/窗口，而不是只打开项目文件夹。
+- **Codex 精确线程跳转**：Codex 会话优先使用官方 `codex://threads/<sessionId>` deep link，尽量跳到对应线程，而不是随机激活某个 Codex 窗口。
+- **Cursor / VS Code 窗口匹配**：针对多个编辑器窗口，按工作区路径匹配对应窗口，减少跳到错误窗口的情况。
+- **项目文件夹保留为按钮**：原来打开项目文件夹的能力保留，但从默认点击行为改为独立按钮，避免和“回到编辑器”混在一起。
+- **正上方面板改为主动触发**：保留原来的详情面板和权限卡片，但等待/完成事件不再自动展开，降低对当前工作的打扰。
+- **OpenClaw 连接误报修复**：本地 gateway 检测不再只认 `openclaw-gateway` 进程名，改用 lock/PID 检测，避免 Node 进程模式下误报 `gateway not running`。
+- **DeskMate 独立品牌化**：应用名、Bundle ID、安装脚本、官网、更新 manifest、Cursor 辅助扩展等信息已切换到 DeskMate。
 
 <p align="center">
   <b>编程模式</b><br/>
@@ -31,7 +44,7 @@
   <img src="https://github.com/user-attachments/assets/2a143250-174a-406e-8a43-fd30db7ce071" width="600" />
 </p>
 
-## 功能
+## 功能概览
 
 - 实时响应 OpenClaw / Claude Code / Codex / Cursor agent 活动状态（工作、空闲、等待）
 - 不只是打开应用，而是尽量跳回具体工作现场：支持 Codex 线程 deep link、Cursor/VS Code 工作区窗口匹配，以及完成提示点击后回到对应编辑器

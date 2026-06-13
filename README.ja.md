@@ -6,7 +6,7 @@
   <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Download-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README.zh.md">中文</a> | <b>日本語</b> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
+  <a href="./README.en.md">English</a> | <a href="./README.md">中文</a> | <b>日本語</b> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
 </p>
 <p align="center">
   AI コーディングエージェントを監視するデスクトップペット、macOS と Windows に対応。

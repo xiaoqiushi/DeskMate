@@ -6,7 +6,7 @@
   <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Descargar-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README.zh.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <b>Español</b> | <a href="./README.fr.md">Français</a>
+  <a href="./README.en.md">English</a> | <a href="./README.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <b>Español</b> | <a href="./README.fr.md">Français</a>
 </p>
 <p align="center">
   Mascota de escritorio que monitorea agentes de programación con IA, compatible con macOS y Windows.
