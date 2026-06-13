@@ -12,6 +12,10 @@
   桌面宠物应用，实时监控你的 AI 编程 agent 工作状态。支持 macOS 和 Windows。
 </p>
 
+> DeskMate 是基于原项目 [OC-Claw](https://github.com/rainnoon/oc-claw)
+> 的独立二次开发版本。当前分支保留原项目的桌宠与 agent 监控基础，并继续进行
+> DeskMate 品牌、任务完成提示、编辑器跳转和工作流体验等方向的改造。
+
 <p align="center">
   <b>编程模式</b><br/>
   <sub>macOS：OpenClaw、Claude Code、Cursor、Codex</sub><br/>
@@ -80,6 +84,7 @@ npx tauri dev
 
 ## 致谢
 
+- [OC-Claw](https://github.com/rainnoon/oc-claw) — 原始上游项目
 - [Notchi](https://github.com/sk-ruban/notchi) — 刘海伴侣概念和草地岛屿的设计灵感
 - [Vibe Island](https://github.com/vibeislandapp/vibe-island) — 交互设计参考
 

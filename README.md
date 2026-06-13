@@ -12,6 +12,11 @@
   A desktop pet that monitors your AI coding agents in real time. Supports macOS and Windows.
 </p>
 
+> DeskMate is an independent secondary development based on the original
+> [OC-Claw](https://github.com/rainnoon/oc-claw) project. This fork keeps the
+> original desktop pet and agent-monitoring foundation, and continues with
+> DeskMate-specific product naming, notification, jump, and workflow changes.
+
 <p align="center">
   <b>Code Mode</b><br/>
   <sub>macOS: OpenClaw, Claude Code, Cursor, Codex</sub><br/>
@@ -80,6 +85,7 @@ Thanks for the support and feedback from the friends at [LINUX DO](https://linux
 
 ## Credits
 
+- [OC-Claw](https://github.com/rainnoon/oc-claw) — original upstream project
 - [Notchi](https://github.com/sk-ruban/notchi) — design inspiration for notch companion concept and grass island
 - [Vibe Island](https://github.com/vibeislandapp/vibe-island) — interaction design reference
 
