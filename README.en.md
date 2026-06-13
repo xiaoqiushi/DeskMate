@@ -6,29 +6,25 @@
   <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Download-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
-  <b>English</b> | <a href="./README.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
+  <b>English</b> | <a href="./README.md">中文</a>
 </p>
 <p align="center">
-  A desktop companion for AI coding agents: monitor tasks, get non-intrusive completion alerts, and jump back to the exact editor window or Codex thread.
+  A desktop companion for AI coding agents, with task monitoring, completion alerts, and editor window jumps.
 </p>
 
-> DeskMate is an independent secondary development based on the original
-> [OC-Claw](https://github.com/rainnoon/oc-claw) project. This fork keeps the
-> original desktop pet and agent-monitoring foundation, and continues with
-> DeskMate-specific product naming, notification, jump, and workflow changes.
+> DeskMate is a secondary development based on [OC-Claw](https://github.com/rainnoon/oc-claw).
 
-## Secondary development highlights
+## Fork changes
 
-DeskMate is not just a rename. This fork focuses on improving what happens after an AI task finishes: how the app notifies you, and how it brings you back to the right working context.
-
-- **Top-right completion toast**: completed tasks now show a lightweight top-right notification with task, project, reply summary, and action entry points, instead of automatically interrupting the current workflow with the top panel.
-- **Click to return to the editor**: completion toasts and session entries prioritize jumping back to the corresponding editor/window, instead of only opening the project folder.
-- **Precise Codex thread jump**: Codex sessions prefer the official `codex://threads/<sessionId>` deep link, so DeskMate can return to the corresponding thread instead of activating a random Codex window.
-- **Cursor / VS Code window matching**: when multiple editor windows are open, DeskMate matches by workspace path to reduce wrong-window jumps.
-- **Project folder kept as a button**: the original project-folder opening behavior is still available, but is now an explicit button instead of the default click behavior.
-- **Top panel is manually triggered**: the original detail panel and permission card are retained, but waiting/completion events no longer auto-expand it.
-- **OpenClaw gateway false-positive fix**: gateway detection no longer depends only on the `openclaw-gateway` process name, and now uses lock/PID checks to avoid false `gateway not running` reports in Node process mode.
-- **Independent DeskMate branding**: app name, Bundle ID, install scripts, website, update manifest, and Cursor helper extension metadata have been switched to DeskMate.
+- The default README is Chinese. English documentation is kept in [README.en.md](./README.en.md).
+- App name, Bundle ID, install scripts, website, update manifest, and Cursor helper extension metadata have been changed to DeskMate.
+- Task completion alerts are shown in the top-right corner instead of automatically opening the top panel.
+- The top panel is retained and changed to manual trigger for details and permission-related information.
+- Completion alerts and session entries prioritize jumping to the corresponding editor window.
+- Codex sessions support `codex://threads/<sessionId>` for thread jumps.
+- Cursor / VS Code windows are matched by workspace path when multiple windows are open.
+- Opening the project folder is retained as a separate button.
+- OpenClaw gateway detection now uses lock/PID checks to reduce false reports.
 
 <p align="center">
   <b>Code Mode</b><br/>
@@ -48,8 +44,8 @@ DeskMate is not just a rename. This fork focuses on improving what happens after
 ## What it does
 
 - Reacts to OpenClaw / Claude Code / Codex / Cursor agent activity in real time (working, idle, waiting)
-- Jumps back to the right place instead of just opening an app: precise Codex thread deep links, Cursor/VS Code workspace-window matching, and editor-focused actions for completion toasts
-- Shows completion details in a top-right toast so task results stay visible without interrupting the current app
+- Supports Codex thread deep links, Cursor/VS Code workspace-window matching, and editor-focused actions for completion toasts
+- Shows completion details in a top-right toast with task, project, reply summary, and jump actions
 - Desktop pet character animates when agents work and sleeps when idle (macOS notch or Windows taskbar)
 - Auto-discovers local OpenClaw agents with session lists, chat history, and daily calls/tokens charts
 - Listens to local Claude Code, Codex, and Cursor sessions via hooks, view live conversations
