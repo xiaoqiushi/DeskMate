@@ -9,7 +9,7 @@
   <a href="./README.md">English</a> | <b>中文</b> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
 </p>
 <p align="center">
-  桌面宠物应用，实时监控你的 AI 编程 agent 工作状态。支持 macOS 和 Windows。
+  面向 AI 编程 agent 的桌面伙伴：监控任务状态、低打扰提示完成结果，并跳转回对应的编辑器窗口或 Codex 线程。
 </p>
 
 > DeskMate 是基于原项目 [OC-Claw](https://github.com/rainnoon/oc-claw)
@@ -34,6 +34,8 @@
 ## 功能
 
 - 实时响应 OpenClaw / Claude Code / Codex / Cursor agent 活动状态（工作、空闲、等待）
+- 不只是打开应用，而是尽量跳回具体工作现场：支持 Codex 线程 deep link、Cursor/VS Code 工作区窗口匹配，以及完成提示点击后回到对应编辑器
+- 任务完成信息显示在右上角提示，不再自动打断当前操作；提示里保留任务、项目、回复摘要和跳转入口
 - 桌面宠物角色，工作时播放动画，休息时打盹（macOS 刘海或 Windows 任务栏）
 - 自动发现本地 OpenClaw agent，显示 session 列表、聊天记录、调用量/token 统计图表
 - 通过 Hook 监听本地 Claude Code、Codex 和 Cursor 会话，查看实时对话
@@ -58,7 +60,7 @@ Cursor          ──→ Hooks ──→ 事件解析 ──→ 活动状态
                           角色动画 ← 状态机 ← 提示音效
 ```
 
-DeskMate 通过轮询 OpenClaw session 文件检测 agent 活动，并通过安装的 Hook 监听 Claude Code、Codex 和 Cursor。活动状态驱动刘海岛屿上的角色动画，可展开面板查看 session 详情、聊天记录和统计数据。
+DeskMate 通过轮询 OpenClaw session 文件检测 agent 活动，并通过安装的 Hook 监听 Claude Code、Codex 和 Cursor。活动状态驱动刘海岛屿上的角色动画；完成提示和会话列表则负责把你带回对应编辑器窗口、工作区或 Codex 线程。
 
 ## 技术栈
 

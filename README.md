@@ -9,7 +9,7 @@
   <b>English</b> | <a href="./README.zh.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
 </p>
 <p align="center">
-  A desktop pet that monitors your AI coding agents in real time. Supports macOS and Windows.
+  A desktop companion for AI coding agents: monitor tasks, get non-intrusive completion alerts, and jump back to the exact editor window or Codex thread.
 </p>
 
 > DeskMate is an independent secondary development based on the original
@@ -35,6 +35,8 @@
 ## What it does
 
 - Reacts to OpenClaw / Claude Code / Codex / Cursor agent activity in real time (working, idle, waiting)
+- Jumps back to the right place instead of just opening an app: precise Codex thread deep links, Cursor/VS Code workspace-window matching, and editor-focused actions for completion toasts
+- Shows completion details in a top-right toast so task results stay visible without interrupting the current app
 - Desktop pet character animates when agents work and sleeps when idle (macOS notch or Windows taskbar)
 - Auto-discovers local OpenClaw agents with session lists, chat history, and daily calls/tokens charts
 - Listens to local Claude Code, Codex, and Cursor sessions via hooks, view live conversations
@@ -59,7 +61,7 @@ Cursor          ──→ Hooks ──→ Event parser ──→ Activity state
                     Animated sprites ← State machine ← Sound effects
 ```
 
-DeskMate polls OpenClaw session files to detect agent activity, and listens to Claude Code, Codex, and Cursor via installed hooks. Activity states drive character animations on the notch island, with an expandable panel for session details, chat history, and metrics.
+DeskMate polls OpenClaw session files to detect agent activity, and listens to Claude Code, Codex, and Cursor via installed hooks. Activity states drive character animations on the notch island, while completion toasts and session rows can take you back to the corresponding editor window, workspace, or Codex thread.
 
 ## Tech Stack
 
