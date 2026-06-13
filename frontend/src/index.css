@@ -105,3 +105,17 @@ input, textarea, pre, [contenteditable], .selectable-text, .selectable-text * {
 }
 .markdown-inline > p { display: inline; }
 .markdown-inline > * { display: inline; }
+
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

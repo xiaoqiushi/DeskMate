@@ -1,9 +1,9 @@
 <p align="center">
   <img src="icon.png" width="80" />
 </p>
-<h1 align="center">OC-Claw</h1>
+<h1 align="center">DeskMate</h1>
 <p align="center">
-  <a href="https://www.oc-claw.ai"><img src="https://img.shields.io/badge/前往官网下载-oc--claw.ai-8A2BE2?style=for-the-badge" alt="Download" /></a>
+  <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/下载-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
   <a href="./README.md">English</a> | <b>中文</b> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
@@ -54,7 +54,7 @@ Cursor          ──→ Hooks ──→ 事件解析 ──→ 活动状态
                           角色动画 ← 状态机 ← 提示音效
 ```
 
-OC-Claw 通过轮询 OpenClaw session 文件检测 agent 活动，并通过安装的 Hook 监听 Claude Code、Codex 和 Cursor。活动状态驱动刘海岛屿上的角色动画，可展开面板查看 session 详情、聊天记录和统计数据。
+DeskMate 通过轮询 OpenClaw session 文件检测 agent 活动，并通过安装的 Hook 监听 Claude Code、Codex 和 Cursor。活动状态驱动刘海岛屿上的角色动画，可展开面板查看 session 详情、聊天记录和统计数据。
 
 ## 技术栈
 

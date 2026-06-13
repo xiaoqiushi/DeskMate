@@ -1,9 +1,9 @@
-# install.ps1 — One-line installer for oc-claw on Windows
-# Usage:  irm https://raw.githubusercontent.com/rainnoon/oc-claw/main/install.ps1 | iex
+# install.ps1 — One-line installer for DeskMate on Windows
+# Usage:  irm https://raw.githubusercontent.com/xiaoqiushi/DeskMate/main/install.ps1 | iex
 $ErrorActionPreference = 'Stop'
 
-$Repo     = "rainnoon/oc-claw"
-$AppName  = "oc-claw"
+$Repo     = "xiaoqiushi/DeskMate"
+$AppName  = "DeskMate"
 
 Write-Host "Installing ${AppName}..." -ForegroundColor Cyan
 
@@ -23,7 +23,7 @@ $fileName     = $asset.name
 $isMsi        = $fileName -match '\.msi$'
 
 # ── Download ─────────────────────────────────────────────────────────────────
-$tempDir = Join-Path $env:TEMP "oc-claw-install-$(Get-Date -Format 'yyyyMMddHHmmss')"
+$tempDir = Join-Path $env:TEMP "DeskMate-install-$(Get-Date -Format 'yyyyMMddHHmmss')"
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 $installerPath = Join-Path $tempDir $fileName
 

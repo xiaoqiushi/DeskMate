@@ -81,7 +81,7 @@ function ConnectionRow({ conn, onUpdate, onDelete, disableLocal }: { conn: OcCon
       } else {
         const store = await getStore()
         const agentId = ((await store.get('tracked_agent')) as string) || 'main'
-        const result: any = await invoke('get_status', { gatewayUrl: 'http://localhost:4446', token: '', agentId })
+        const result: any = await invoke('get_status', { gatewayUrl: 'http://localhost:18789', token: '', agentId })
         if (cancelledRef.current) return
         setTestMsg(`${result.sessions.length} ${t('settings.sessions')}`)
       }
@@ -924,7 +924,7 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
           <div className="flex items-center justify-between p-4">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium text-white/90">{t('settings.autostart', 'Launch on Login')}</span>
-              <span className="text-xs text-white/40">{t('settings.autostartDesc', 'Start oc-claw automatically when you log in')}</span>
+              <span className="text-xs text-white/40">{t('settings.autostartDesc', 'Start DeskMate automatically when you log in')}</span>
               {autostartStatus && <span className="text-xs text-red-400 mt-1 break-all">{autostartStatus}</span>}
             </div>
             <Toggle checked={enableAutostart} onChange={toggleAutostart} />
@@ -1034,7 +1034,7 @@ export function SettingsTab({ notifySound, onChangeNotifySound, waitingSound, on
               {(['zh', 'en', 'ja', 'ko', 'es', 'fr'] as const).map((lng) => (
                 <button
                   key={lng}
-                  onClick={async () => { i18n.changeLanguage(lng); localStorage.setItem('oc-claw-lang', lng); const store = await getStore(); await store.set('oc-claw-lang', lng); await store.save(); invoke('update_tray_language', { lang: lng }).catch(() => {}) }}
+                  onClick={async () => { i18n.changeLanguage(lng); localStorage.setItem('deskmate-lang', lng); const store = await getStore(); await store.set('deskmate-lang', lng); await store.save(); invoke('update_tray_language', { lang: lng }).catch(() => {}) }}
                   className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${i18n.language === lng ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'}`}
                 >
                   {t(`settings.lang${lng.charAt(0).toUpperCase() + lng.slice(1)}`)}

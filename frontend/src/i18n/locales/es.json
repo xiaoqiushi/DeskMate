@@ -151,7 +151,7 @@
 
     "system": "Sistema",
     "autostart": "Iniciar al iniciar sesión",
-    "autostartDesc": "Iniciar oc-claw automáticamente al iniciar sesión",
+    "autostartDesc": "Iniciar DeskMate automáticamente al iniciar sesión",
     "autostartFailed": "Error al actualizar el inicio automático:",
 
     "about": "Acerca de",

@@ -30,6 +30,8 @@ static MINI_WINDOW_FRAME: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None)
 /// original collapsed frame before expanding, then restore exactly to avoid
 /// mascot "teleport" after right-click close.
 static PET_MENU_RESTORE_FRAME: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
+static COMPLETION_TOAST_PAYLOAD: std::sync::LazyLock<Mutex<Option<CompletionToastPayload>>> =
+    std::sync::LazyLock::new(|| Mutex::new(None));
 /// Generation counter for pet-context alpha restore (legacy resize path).
 #[cfg(target_os = "macos")]
 static PET_ALPHA_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -806,16 +808,16 @@ fn build_agent_health_from_meta(
 }
 
 /// Get the SSH control socket path for a given host.
-/// On macOS/Linux: /tmp/oc-claw-ssh-user@host:22
+/// On macOS/Linux: /tmp/DeskMate-ssh-user@host:22
 /// On Windows: returns a path in %TEMP% (used only as a "marker" since ControlMaster
 /// is not supported; the marker file tracks whether a connection was recently validated).
 fn ssh_control_path(ssh_user: &str, ssh_host: &str) -> String {
     #[cfg(unix)]
-    { format!("/tmp/oc-claw-ssh-{}@{}:22", ssh_user, ssh_host) }
+    { format!("/tmp/DeskMate-ssh-{}@{}:22", ssh_user, ssh_host) }
     #[cfg(windows)]
     {
         let temp = std::env::temp_dir();
-        temp.join(format!("oc-claw-ssh-{}@{}.marker", ssh_user, ssh_host))
+        temp.join(format!("DeskMate-ssh-{}@{}.marker", ssh_user, ssh_host))
             .to_string_lossy().to_string()
     }
 }
@@ -1138,7 +1140,7 @@ async fn close_ssh(ssh_host: Option<String>, ssh_user: Option<String>) -> Result
         if let Ok(mut entries) = tokio::fs::read_dir(&scan_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with("oc-claw-ssh-") {
+                if name.starts_with("DeskMate-ssh-") {
                     let _ = tokio::fs::remove_file(entry.path()).await;
                     log::info!("[close_ssh] removed stale socket/marker: {}", name);
                 }
@@ -1295,15 +1297,8 @@ fn sessions_json_path(agent_id: &str) -> PathBuf {
 async fn get_status(_gateway_url: String, _token: String, agent_id: String) -> Result<GatewayStatus, String> {
     // Step 1: check gateway is running
     #[cfg(unix)]
-    {
-        let pgrep_gw = tokio::process::Command::new("pgrep")
-            .args(["-x", "openclaw-gateway"])
-            .output()
-            .await
-            .map_err(|e| format!("pgrep: {}", e))?;
-        if !pgrep_gw.status.success() {
-            return Err("gateway not running".into());
-        }
+    if !is_openclaw_gateway_alive() {
+        return Err("gateway not running".into());
     }
     #[cfg(windows)]
     {
@@ -3064,7 +3059,7 @@ async fn open_mini(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     let builder = WebviewWindowBuilder::new(&app, "mini", WebviewUrl::App("index.html#/mini".into()))
-        .title("oc-claw Mini")
+        .title("DeskMate Mini")
         .inner_size(COLLAPSED_MASCOT_BASE_W, COLLAPSED_MASCOT_BASE_H)
         .decorations(false)
         .transparent(true)
@@ -4246,7 +4241,7 @@ async fn get_now_playing(app: tauri::AppHandle) -> Result<String, String> {
             let cli_status = nowplaying_cli_status();
 
             let result = if let Some((playing, ref source)) = cli_status {
-                if !playing || source.contains("openclaw") || source.contains("ooclaw") || source.contains("com.apple.webkit") {
+                if !playing || source.contains("openclaw") || source.contains("deskmate") || source.contains("com.apple.webkit") {
                     // Not playing, or our own pet SFX hijacked the Now Playing session.
                     // WebView audio (HTML5 Audio / <video>) reports as "com.apple.WebKit.GPU",
                     // not the host app's bundle ID, so we must also filter that.
@@ -6526,7 +6521,7 @@ async fn open_detail_panel(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     let win = WebviewWindowBuilder::new(&app, "detail", WebviewUrl::App("index.html#/detail".into()))
-        .title("oc-claw - Detail")
+        .title("DeskMate - Detail")
         .inner_size(480.0, 600.0)
         .decorations(true)
         .resizable(true)
@@ -6607,6 +6602,28 @@ async fn play_sound(name: String) -> Result<(), String> {
 }
 
 // ─── Claude Code session state ───
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CompletionToastPayload {
+    session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    project_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cwd: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    user_prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_response: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    updated_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auto_close: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pet: Option<serde_json::Value>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClaudeSession {
@@ -6748,7 +6765,7 @@ fn collect_jsonl_files_recursive(root: &std::path::Path) -> Vec<PathBuf> {
 /// Build an empty 14-day `ClaudeStats` skeleton with zeroed daily entries.
 /// Used for sources where token usage is intentionally not surfaced — at the
 /// moment that means `cursor`, since Cursor doesn't expose reliable per-turn
-/// token counts to oc-claw (it stopped writing them to its local SQLite in
+/// token counts to DeskMate (it stopped writing them to its local SQLite in
 /// April 2026, and the hook payload would only cover sessions completed after
 /// the user enables tracking, which is misleading).
 fn empty_claude_stats() -> ClaudeStats {
@@ -7086,11 +7103,11 @@ fn get_frontmost_app_name() -> String {
 fn get_frontmost_app_name() -> String { String::new() }
 
 fn is_cursor_frontmost_app(name: &str) -> bool {
-    name == "Cursor" || name == "oc-claw"
+    name == "Cursor" || name == "DeskMate"
 }
 
 fn is_codex_frontmost_app(name: &str) -> bool {
-    if name == "oc-claw" || name == "Code" || name == "Visual Studio Code" {
+    if name == "DeskMate" || name == "Code" || name == "Visual Studio Code" {
         return true;
     }
     let lowered = name.to_ascii_lowercase();
@@ -7098,16 +7115,39 @@ fn is_codex_frontmost_app(name: &str) -> bool {
 }
 
 fn is_codex_host_terminal(name: &str) -> bool {
-    name == "Code" || name == "Visual Studio Code" || name.eq_ignore_ascii_case("codex")
+    name.eq_ignore_ascii_case("codex")
+}
+
+fn is_vscode_host_terminal(name: &str) -> bool {
+    name == "Code" || name == "Visual Studio Code"
+}
+
+fn looks_like_codex_thread_id(id: &str) -> bool {
+    id.len() == 36
+        && id.chars().filter(|c| *c == '-').count() == 4
+        && id.chars().all(|c| c == '-' || c.is_ascii_hexdigit())
+}
+
+#[cfg(target_os = "macos")]
+fn open_codex_thread_deeplink(session_id: &str) -> bool {
+    if !looks_like_codex_thread_id(session_id) {
+        return false;
+    }
+    let url = format!("codex://threads/{session_id}");
+    std::process::Command::new("open")
+        .arg(&url)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 /// Check if the frontmost app matches the host terminal name.
 /// `host_terminal` comes from process-chain detection (e.g. "Terminal",
 /// "iTerm2", "Warp") while `frontmost` is the short app name from
 /// NSWorkspace (e.g. "Terminal", "iTerm2", "Warp").
-/// Also handles "oc-claw" (our own panel can steal focus).
+/// Also handles "DeskMate" (our own panel can steal focus).
 fn frontmost_matches_host_terminal(frontmost: &str, host_terminal: &str) -> bool {
-    if frontmost == "oc-claw" {
+    if frontmost == "DeskMate" {
         return true;
     }
     if frontmost.eq_ignore_ascii_case(host_terminal) {
@@ -7120,6 +7160,11 @@ fn frontmost_matches_host_terminal(frontmost: &str, host_terminal: &str) -> bool
     // Claude Code Desktop's macOS bundle short name is "Claude" while the
     // host_terminal we tag is "Claude Desktop" (matches the Windows label).
     if host_terminal == "Claude Desktop" && frontmost.eq_ignore_ascii_case("Claude") {
+        return true;
+    }
+    if is_vscode_host_terminal(host_terminal)
+        && (frontmost == "Code" || frontmost == "Visual Studio Code")
+    {
         return true;
     }
     false
@@ -7252,7 +7297,7 @@ async fn resolve_claude_permission(
     };
 
     // Codex permissions are intentionally approved in Codex's native UI.
-    // The oc-claw popup only serves as a reminder + jump action and must not
+    // The DeskMate popup only serves as a reminder + jump action and must not
     // make the final allow/deny decision for Codex sessions.
     if source == "codex" {
         log::info!(
@@ -7685,6 +7730,174 @@ async fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+const COMPLETION_TOAST_W: f64 = 440.0;
+const COMPLETION_TOAST_H: f64 = 238.0;
+
+fn position_completion_toast(app: &tauri::AppHandle, win: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        let win_clone = win.clone();
+        let mini_win = app.get_webview_window("mini");
+        let _ = app.run_on_main_thread(move || {
+            use objc2::msg_send;
+            use objc2::runtime::{AnyClass, AnyObject};
+            use objc2_foundation::{NSPoint, NSRect, NSSize};
+
+            if let Ok(ns_win) = win_clone.ns_window() {
+                let obj = unsafe { &*(ns_win as *mut AnyObject) };
+                let screen_frame: Option<NSRect> = unsafe {
+                    let mini_screen = mini_win
+                        .as_ref()
+                        .and_then(|mini| mini.ns_window().ok())
+                        .and_then(|mini_ns| {
+                            let mini_obj = &*(mini_ns as *mut AnyObject);
+                            let screen: *mut AnyObject = msg_send![mini_obj, screen];
+                            if screen.is_null() {
+                                None
+                            } else {
+                                Some(screen)
+                            }
+                        });
+                    let screen = if let Some(screen) = mini_screen {
+                        screen
+                    } else if let Some(cls) = AnyClass::get(c"NSScreen") {
+                        msg_send![cls, mainScreen]
+                    } else {
+                        std::ptr::null_mut()
+                    };
+                    if screen.is_null() {
+                        None
+                    } else {
+                        let frame: NSRect = msg_send![&*screen, frame];
+                        Some(frame)
+                    }
+                };
+                let Some(sf) = screen_frame else { return };
+                let margin = 18.0;
+                let x = sf.origin.x + sf.size.width - COMPLETION_TOAST_W - margin;
+                let y = sf.origin.y + sf.size.height - COMPLETION_TOAST_H - margin;
+                let frame = NSRect::new(
+                    NSPoint::new(x, y),
+                    NSSize::new(COMPLETION_TOAST_W, COMPLETION_TOAST_H),
+                );
+                unsafe {
+                    let _: () = msg_send![obj, setLevel: 27isize];
+                    let behavior: usize = (1 << 0) | (1 << 4) | (1 << 8) | (1 << 6);
+                    let _: () = msg_send![obj, setCollectionBehavior: behavior];
+                    let _: () = msg_send![obj, setFrame: frame, display: true, animate: false];
+                }
+            }
+        });
+        return;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let monitor = app
+            .get_webview_window("mini")
+            .and_then(|mini| mini.current_monitor().ok().flatten())
+            .or_else(|| win.current_monitor().ok().flatten())
+            .or_else(|| win.primary_monitor().ok().flatten());
+
+    #[cfg(not(target_os = "macos"))]
+    if let Some(monitor) = monitor {
+        let scale = monitor.scale_factor();
+        let pos = monitor.position();
+        let size = monitor.size();
+        let mx = pos.x as f64 / scale;
+        let my = pos.y as f64 / scale;
+        let sw = size.width as f64 / scale;
+        let margin = 18.0;
+        let x = mx + sw - COMPLETION_TOAST_W - margin;
+        let y = my + margin;
+        let _ = win.set_size(tauri::LogicalSize::new(COMPLETION_TOAST_W, COMPLETION_TOAST_H));
+        let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+    }
+
+}
+
+#[tauri::command]
+async fn show_completion_toast(app: tauri::AppHandle, payload: CompletionToastPayload) -> Result<(), String> {
+    {
+        let mut current = COMPLETION_TOAST_PAYLOAD.lock().map_err(|e| e.to_string())?;
+        *current = Some(payload.clone());
+    }
+
+    let win = if let Some(win) = app.get_webview_window("completion-toast") {
+        win
+    } else {
+        WebviewWindowBuilder::new(&app, "completion-toast", WebviewUrl::App("index.html#/completion-toast".into()))
+            .title("DeskMate completion")
+            .inner_size(COMPLETION_TOAST_W, COMPLETION_TOAST_H)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false)
+            .accept_first_mouse(true)
+            .build()
+            .map_err(|e| e.to_string())?
+    };
+
+    position_completion_toast(&app, &win);
+    let _ = win.set_always_on_top(true);
+    win.show().map_err(|e| e.to_string())?;
+    let _ = app.emit("completion-toast-payload", &payload);
+    Ok(())
+}
+
+#[tauri::command]
+async fn hide_completion_toast(app: tauri::AppHandle) -> Result<(), String> {
+    {
+        let mut current = COMPLETION_TOAST_PAYLOAD.lock().map_err(|e| e.to_string())?;
+        *current = None;
+    }
+    if let Some(win) = app.get_webview_window("completion-toast") {
+        win.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_completion_toast_payload() -> Result<Option<CompletionToastPayload>, String> {
+    COMPLETION_TOAST_PAYLOAD
+        .lock()
+        .map(|payload| payload.clone())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn open_claude_session_project(session_id: String, state: tauri::State<'_, ClaudeState>) -> Result<String, String> {
+    let cwd = {
+        let sessions = state.sessions.lock().map_err(|e| e.to_string())?;
+        sessions
+            .get(&session_id)
+            .map(|s| s.cwd.clone())
+            .ok_or("Session not found")?
+    };
+    if cwd.trim().is_empty() {
+        return Err("No project path tracked for this session".into());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(&cwd).spawn().map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = std::process::Command::new("explorer");
+        cmd.arg(&cwd);
+        hide_window_cmd(&mut cmd);
+        cmd.spawn().map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open").arg(&cwd).spawn().map_err(|e| e.to_string())?;
+    }
+    Ok(cwd)
+}
+
 #[derive(Debug, Serialize)]
 pub struct CodexPetMeta {
     pub id: String,
@@ -7805,7 +8018,7 @@ async fn spawn_demo_mascot(app: tauri::AppHandle, pet_id: String) -> Result<Stri
         label.clone(),
         tauri::WebviewUrl::App(url.into()),
     )
-    .title("oc-claw demo mascot")
+    .title("DeskMate demo mascot")
     .inner_size(96.0, 96.0)
     .min_inner_size(96.0, 96.0)
     .resizable(false)
@@ -8734,7 +8947,7 @@ fn find_host_app_for_pid_win(pid: u32) -> Option<String> {
 /// Cursor window so that at least the app is raised.
 ///
 /// `SetForegroundWindow` is restricted by Windows: it only fully succeeds when
-/// the caller is itself the foreground process. oc-claw normally is foreground
+/// the caller is itself the foreground process. DeskMate normally is foreground
 /// at click time (the user just clicked the mini panel), so this works in
 /// practice. We additionally restore the window if it is minimized.
 #[cfg(target_os = "windows")]
@@ -8919,6 +9132,75 @@ end tell"#,
         .output();
 }
 
+#[cfg(target_os = "macos")]
+fn activate_vscode_workspace_window(cwd: &str) -> bool {
+    let workspace_name = std::path::Path::new(cwd)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+    let escaped_workspace = workspace_name.replace('\\', "\\\\").replace('"', "\\\"");
+
+    if check_accessibility_permission() && !escaped_workspace.is_empty() {
+        let script = format!(
+            r#"tell application "System Events"
+    set matched to false
+    repeat with procName in {{"Code", "Visual Studio Code"}}
+        set codeProcs to every process whose name is (procName as text)
+        repeat with codeProc in codeProcs
+            repeat with w in windows of codeProc
+                try
+                    if name of w contains "{workspace}" then
+                        perform action "AXRaise" of w
+                        set frontmost of codeProc to true
+                        set matched to true
+                        return "matched"
+                    end if
+                end try
+            end repeat
+        end repeat
+    end repeat
+    return "not-found"
+end tell"#,
+            workspace = escaped_workspace,
+        );
+        if let Ok(out) = std::process::Command::new("osascript").args(["-e", &script]).output() {
+            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if out.status.success() && stdout == "matched" {
+                log::info!("[vscode_focus] matched workspace window '{}'", workspace_name);
+                return true;
+            }
+        }
+    }
+
+    if !cwd.trim().is_empty() {
+        for app_name in ["Visual Studio Code", "Code"] {
+            if std::process::Command::new("open")
+                .args(["-a", app_name, cwd])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+            {
+                log::info!("[vscode_focus] opened workspace '{}' via {}", cwd, app_name);
+                return true;
+            }
+        }
+    }
+
+    for app_name in ["Visual Studio Code", "Code"] {
+        if std::process::Command::new("open")
+            .args(["-a", app_name])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            log::info!("[vscode_focus] fallback activated {}", app_name);
+            return false;
+        }
+    }
+    false
+}
+
 /// Focus the Cursor terminal tab for a given session.
 /// Cursor hook payloads do not contain a stable terminal pid. The pid we see in
 /// events changes from one hook invocation to the next, so it is not reliable
@@ -9031,6 +9313,17 @@ async fn jump_to_claude_terminal(session_id: String, state: tauri::State<'_, Cla
         // Do not route through Ghostty first; that causes the "terminal flash"
         // and may still require manual dock clicks to bring Codex frontmost.
         if source == "codex" {
+            if open_codex_thread_deeplink(&session_id) {
+                return Ok("Opened Codex thread".to_string());
+            }
+            if host_terminal
+                .as_deref()
+                .map(is_vscode_host_terminal)
+                .unwrap_or(false)
+                && activate_vscode_workspace_window(&cwd)
+            {
+                return Ok("Jumped to Visual Studio Code workspace".to_string());
+            }
             for app_name in ["Codex", "Code"] {
                 if try_activate_app(app_name) {
                     return Ok(format!("Activated {}", app_name));
@@ -9350,6 +9643,13 @@ end tell"#,
                     .output();
                 Ok("Jumped to Cursor".to_string())
             }
+            Some("Code" | "Visual Studio Code") => {
+                if activate_vscode_workspace_window(&cwd) {
+                    Ok("Jumped to Visual Studio Code workspace".to_string())
+                } else {
+                    Ok("Activated Visual Studio Code".to_string())
+                }
+            }
             Some("Claude Desktop") => {
                 // The macOS app bundle is `/Applications/Claude.app` and its
                 // AppleScript-resolvable name is `Claude` (CFBundleName), not
@@ -9436,6 +9736,7 @@ fn find_terminal_app_for_pid(pid: u32) -> Option<String> {
         "Alacritty", "alacritty",
         "kaku",
         "Cursor",
+        "Code", "Visual Studio Code",
         "Codex", "codex",
     ];
 
@@ -9506,8 +9807,8 @@ fn get_tty_for_pid(pid: u32) -> Option<String> {
 ///     "version": "1.6.0",
 ///     "notes": "...",
 ///     "platforms": {
-///       "macos":   { "url": "https://github.com/.../oc-claw_1.6.0_aarch64.dmg" },
-///       "windows": { "url": "https://github.com/.../oc-claw_1.6.0_x64-setup.exe" }
+///       "macos":   { "url": "https://github.com/.../DeskMate_1.6.0_aarch64.dmg" },
+///       "windows": { "url": "https://github.com/.../DeskMate_1.6.0_x64-setup.exe" }
 ///     }
 ///   }
 ///
@@ -9558,11 +9859,11 @@ async fn check_for_update(app: tauri::AppHandle, lang: Option<String>) -> Result
     let update_url = if cfg!(debug_assertions) {
         "http://[::1]:4321/update/latest.json"
     } else {
-        "https://www.oc-claw.ai/update/latest.json"
+        "https://raw.githubusercontent.com/xiaoqiushi/DeskMate/main/website/public/update/latest.json"
     };
     log::info!("[update] checking {} (current={})", update_url, current);
     let mut client_builder = reqwest::Client::builder()
-        .user_agent("oc-claw");
+        .user_agent("DeskMate");
     if cfg!(debug_assertions) {
         client_builder = client_builder.no_proxy();
     }
@@ -9683,7 +9984,7 @@ async fn run_update(app: tauri::AppHandle, dmg_url: String) -> Result<(), String
         return Err("No download URL provided".to_string());
     }
     let client = reqwest::Client::builder()
-        .user_agent("oc-claw-updater")
+        .user_agent("DeskMate-updater")
         .build()
         .map_err(|e| format!("client build error: {e}"))?;
     emit_update_progress(&app, "preparing", Some(0), 0, None, "准备下载更新");
@@ -9701,16 +10002,16 @@ async fn run_update(app: tauri::AppHandle, dmg_url: String) -> Result<(), String
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let work_dir = std::env::temp_dir().join(format!("oc-claw-update-{stamp}"));
+    let work_dir = std::env::temp_dir().join(format!("DeskMate-update-{stamp}"));
     std::fs::create_dir_all(&work_dir).map_err(|e| format!("failed to create temp dir: {e}"))?;
 
     // Determine installer file extension based on URL and platform
     #[cfg(target_os = "macos")]
-    let installer_filename = "oc-claw-update.dmg";
+    let installer_filename = "DeskMate-update.dmg";
     #[cfg(target_os = "windows")]
-    let installer_filename = if dmg_url.ends_with(".msi") { "oc-claw-update.msi" } else { "oc-claw-update.exe" };
+    let installer_filename = if dmg_url.ends_with(".msi") { "DeskMate-update.msi" } else { "DeskMate-update.exe" };
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let installer_filename = "oc-claw-update";
+    let installer_filename = "DeskMate-update";
 
     let dmg_path = work_dir.join(installer_filename);
     #[cfg(target_os = "macos")]
@@ -9767,7 +10068,7 @@ async fn run_update(app: tauri::AppHandle, dmg_url: String) -> Result<(), String
         let script = format!(r#"#!/bin/bash
 set -euo pipefail
 PID="{pid}"
-APP_BUNDLE="/Applications/oc-claw.app"
+APP_BUNDLE="/Applications/DeskMate.app"
 DMG_PATH="{dmg_path}"
 LOG_PATH="{log_path}"
 MOUNT_POINT=""
@@ -9895,7 +10196,7 @@ if ($installerPath.EndsWith('.msi')) {{
         'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
     )) {{
         $entry = Get-ItemProperty $regPath -ErrorAction SilentlyContinue |
-            Where-Object {{ $_.DisplayName -eq 'oc-claw' }} | Select-Object -First 1
+            Where-Object {{ $_.DisplayName -eq 'DeskMate' }} | Select-Object -First 1
         if ($entry -and $entry.InstallLocation) {{
             $installDir = $entry.InstallLocation.Trim('"')
             break
@@ -9914,17 +10215,17 @@ if ($installerPath.EndsWith('.msi')) {{
 
 Log "Launching updated app"
 # Find install location from registry (user may have chosen a custom path).
-# The executable is named oc_claw.exe (productName config produces this binary name).
+# The executable is named DeskMate.exe (productName config produces this binary name).
 $appPath = $null
 foreach ($regPath in @(
     'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
 )) {{
     $entry = Get-ItemProperty $regPath -ErrorAction SilentlyContinue |
-        Where-Object {{ $_.DisplayName -eq 'oc-claw' }} | Select-Object -First 1
+        Where-Object {{ $_.DisplayName -eq 'DeskMate' }} | Select-Object -First 1
     if ($entry -and $entry.InstallLocation) {{
         $loc = $entry.InstallLocation.Trim('"')
-        $candidate = Join-Path $loc 'oc_claw.exe'
+        $candidate = Join-Path $loc 'DeskMate.exe'
         if (Test-Path $candidate) {{
             $appPath = $candidate
             break
@@ -9933,8 +10234,8 @@ foreach ($regPath in @(
 }}
 if (-not $appPath) {{
     # Fallback: check common locations
-    foreach ($dir in @("$env:LOCALAPPDATA\oc-claw", "$env:ProgramFiles\oc-claw", "H:\oc-claw")) {{
-        $candidate = Join-Path $dir 'oc_claw.exe'
+    foreach ($dir in @("$env:LOCALAPPDATA\DeskMate", "$env:ProgramFiles\DeskMate", "H:\DeskMate")) {{
+        $candidate = Join-Path $dir 'DeskMate.exe'
         if (Test-Path $candidate) {{ $appPath = $candidate; break }}
     }}
 }}
@@ -9942,7 +10243,7 @@ if ($appPath) {{
     Log "Relaunching from $appPath"
     Start-Process $appPath
 }} else {{
-    Log "Warning: could not find oc_claw.exe to relaunch"
+    Log "Warning: could not find DeskMate.exe to relaunch"
 }}
 "#,
             pid = std::process::id(),
@@ -10070,15 +10371,15 @@ async fn install_claude_hooks() -> Result<(), String> {
 
     // Write hook script — platform-specific
     #[cfg(unix)]
-    let hook_path = hooks_dir.join("ooclaw-hook.sh");
+    let hook_path = hooks_dir.join("deskmate-hook.sh");
     #[cfg(windows)]
-    let hook_path = hooks_dir.join("ooclaw-hook.ps1");
+    let hook_path = hooks_dir.join("deskmate-hook.ps1");
 
     #[cfg(unix)]
     {
         let hook_script = r#"#!/bin/bash
-# ooclaw Claude Code hook - forwards events to /tmp/ooclaw-claude.sock
-SOCKET_PATH="/tmp/ooclaw-claude.sock"
+# deskmate Claude Code hook - forwards events to /tmp/deskmate-claude.sock
+SOCKET_PATH="/tmp/deskmate-claude.sock"
 [ -S "$SOCKET_PATH" ] || exit 0
 
 # Detect non-interactive (claude -p / --print) sessions
@@ -10091,7 +10392,7 @@ for CHECK_PID in $PPID $(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' '); do
 done
 export OOCLAW_INTERACTIVE=$IS_INTERACTIVE
 # $PPID is the PID of the process that spawned this bash (i.e. Claude Code).
-# Forwarded to oc-claw so it can detect when CC exits (Ctrl+C / SIGKILL)
+# Forwarded to DeskMate so it can detect when CC exits (Ctrl+C / SIGKILL)
 # and clear stale "waiting" sessions.
 export CC_PID=$PPID
 
@@ -10109,7 +10410,7 @@ case "$_PARENT_EXE" in
         GHOSTTY_TID=""
         ;;
     *)
-        _TID_CACHE="/tmp/ooclaw-tid-$PPID"
+        _TID_CACHE="/tmp/deskmate-tid-$PPID"
         if [ -f "$_TID_CACHE" ]; then
             export GHOSTTY_TID=$(cat "$_TID_CACHE" 2>/dev/null)
         else
@@ -10250,7 +10551,7 @@ try {
     # CC Desktop bundles its CLI under a `claude-3p\claude-code` directory,
     # and the desktop Electron app lives in `WindowsApps\...\claude.exe`.
     # We treat either marker as 'desktop'. The first claude.exe encountered
-    # going upward is the CC CLI process; its PID lets oc-claw run PID-alive
+    # going upward is the CC CLI process; its PID lets DeskMate run PID-alive
     # checks (and a deeper parent walk via Win32) to clear stale sessions.
     $ccDesktop = $false
     $ccPid = 0
@@ -10347,7 +10648,7 @@ try {
     // Detect both old (.cmd path) and new (powershell.exe ... .ps1) hook entries for cleanup
     let has_our_hook = |entry: &serde_json::Value| -> bool {
         let is_ours = |cmd: &str| -> bool {
-            cmd == hook_path_str || cmd.contains("ooclaw-hook")
+            cmd == hook_path_str || cmd.contains("deskmate-hook") || cmd.contains("ooclaw-hook")
         };
         entry.get("command").and_then(|c| c.as_str()).map_or(false, |c| is_ours(c))
         || entry.get("hooks").and_then(|hs| hs.as_array()).map_or(false, |hs| {
@@ -10382,18 +10683,21 @@ async fn install_codex_hooks() -> Result<(), String> {
 
     // Codex support is dropped on Windows. Same as the cursor branch above:
     // proactively delete any previously-installed hook script and strip our
-    // entries from hooks.json so the codex CLI cannot reach the oc-claw
+    // entries from hooks.json so the codex CLI cannot reach the DeskMate
     // socket on this machine anymore.
     #[cfg(windows)]
     {
+        let _ = std::fs::remove_file(hooks_dir.join("deskmate-codex-hook.ps1"));
         let _ = std::fs::remove_file(hooks_dir.join("ooclaw-codex-hook.ps1"));
         // Codex's home is conventionally `.codex` on Windows but the install
         // path used `.Codex` historically — the file system is case-
         // insensitive so we clean the same dir, but also catch the
         // lowercase variant explicitly in case both ever exist.
-        let alt = home.join(".codex").join("hooks").join("ooclaw-codex-hook.ps1");
-        if alt.exists() {
-            let _ = std::fs::remove_file(&alt);
+        for alt_name in ["deskmate-codex-hook.ps1", "ooclaw-codex-hook.ps1"] {
+            let alt = home.join(".codex").join("hooks").join(alt_name);
+            if alt.exists() {
+                let _ = std::fs::remove_file(&alt);
+            }
         }
         for hooks_json_path in [codex_dir.join("hooks.json"), home.join(".codex").join("hooks.json")] {
             if !hooks_json_path.exists() { continue; }
@@ -10405,12 +10709,12 @@ async fn install_codex_hooks() -> Result<(), String> {
                     if let Some(arr) = hooks.get_mut(&name).and_then(|v| v.as_array_mut()) {
                         arr.retain(|entry| {
                             let cmd_match = entry.get("command").and_then(|c| c.as_str())
-                                .map(|c| c.contains("ooclaw-codex-hook"))
+                                .map(|c| c.contains("deskmate-codex-hook") || c.contains("ooclaw-codex-hook"))
                                 .unwrap_or(false);
                             let nested_match = entry.get("hooks").and_then(|hs| hs.as_array())
                                 .map(|hs| hs.iter().any(|inner| {
                                     inner.get("command").and_then(|c| c.as_str())
-                                        .map(|c| c.contains("ooclaw-codex-hook"))
+                                        .map(|c| c.contains("deskmate-codex-hook") || c.contains("ooclaw-codex-hook"))
                                         .unwrap_or(false)
                                 }))
                                 .unwrap_or(false);
@@ -10434,21 +10738,21 @@ async fn install_codex_hooks() -> Result<(), String> {
     std::fs::create_dir_all(&hooks_dir).map_err(|e| e.to_string())?;
 
     #[cfg(unix)]
-    let hook_path = hooks_dir.join("ooclaw-codex-hook.sh");
+    let hook_path = hooks_dir.join("deskmate-codex-hook.sh");
     #[cfg(windows)]
-    let hook_path = hooks_dir.join("ooclaw-codex-hook.ps1");
+    let hook_path = hooks_dir.join("deskmate-codex-hook.ps1");
 
     #[cfg(unix)]
     {
         let hook_script = r#"#!/bin/bash
-# ooclaw Codex hook - forwards events to /tmp/ooclaw-claude.sock
-SOCKET_PATH="/tmp/ooclaw-claude.sock"
+# deskmate Codex hook - forwards events to /tmp/deskmate-claude.sock
+SOCKET_PATH="/tmp/deskmate-claude.sock"
 [ -S "$SOCKET_PATH" ] || { echo '{}'; exit 0; }
 export CC_PID=$PPID
 
 # Capture Ghostty terminal ID once per Codex process so stop-time active-tab
 # checks and click-to-jump can target the exact tab.
-_TID_CACHE="/tmp/ooclaw-tid-$PPID"
+_TID_CACHE="/tmp/deskmate-tid-$PPID"
 if [ -f "$_TID_CACHE" ]; then
     export GHOSTTY_TID=$(cat "$_TID_CACHE" 2>/dev/null)
 else
@@ -10540,7 +10844,7 @@ except:
     #[cfg(windows)]
     {
         // On Windows, keep the hook simple: forward Codex JSON to the existing
-        // oc-claw TCP hook server. `process_claude_event` handles both Codex
+        // DeskMate TCP hook server. `process_claude_event` handles both Codex
         // and Claude field variants.
         let ps1_script = r#"$ErrorActionPreference = 'SilentlyContinue'
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
@@ -10611,7 +10915,7 @@ try {
 
     let has_our_hook = |entry: &serde_json::Value| -> bool {
         let is_ours = |cmd: &str| -> bool {
-            cmd == hook_command || cmd.contains("ooclaw-codex-hook")
+            cmd == hook_command || cmd.contains("deskmate-codex-hook") || cmd.contains("ooclaw-codex-hook")
         };
         entry.get("command").and_then(|c| c.as_str()).map_or(false, |c| is_ours(c))
             || entry.get("hooks").and_then(|hs| hs.as_array()).map_or(false, |hs| {
@@ -11191,7 +11495,7 @@ fn process_claude_event(
                 if hook_event == "Stop" {
                     let interrupted = stop_event_was_interrupted(&event, &session.source, &claude_status);
                     // CC: check if the user is looking at this session's Ghostty tab
-                    // Cursor: check if Cursor (or oc-claw) is the frontmost app.
+                    // Cursor: check if Cursor (or DeskMate) is the frontmost app.
                     // If a terminal ID is missing (older hooks / non-Ghostty),
                     // fall back to host-terminal checks where available.
                     let frontmost = get_frontmost_app_name();
@@ -11626,13 +11930,13 @@ try {
 
     log::info!("[cursor_hooks] installed hooks to {:?}", hooks_json_path);
 
-    // ── Sync oc-claw terminal-focus extension for Cursor ──
+    // ── Sync DeskMate terminal-focus extension for Cursor ──
     // The extension exposes a tiny localhost API per Cursor window:
     // - GET  /window-meta  → workspace roots + focus state + bound port
     // - POST /focus-window → surface that specific Cursor window
     // We intentionally overwrite the installed files on every startup so
     // extension changes take effect after the user reloads Cursor windows.
-    let ext_id = "oc-claw.terminal-focus";
+    let ext_id = "deskmate.terminal-focus";
     let ext_dir = home.join(".cursor").join("extensions").join(format!("{}-1.0.0", ext_id));
     log::info!("[cursor_hooks] syncing terminal-focus extension...");
 
@@ -11873,7 +12177,7 @@ fn start_cursor_socket_server(
 }
 
 /// Start the Claude IPC server.
-/// On macOS/Linux: Unix domain socket at /tmp/ooclaw-claude.sock
+/// On macOS/Linux: Unix domain socket at /tmp/deskmate-claude.sock
 /// On Windows: TCP server on localhost:19283
 fn start_claude_socket_server(
     claude_state: Arc<Mutex<HashMap<String, ClaudeSession>>>,
@@ -11886,7 +12190,7 @@ fn start_claude_socket_server(
         let pending = pending_permissions;
         let app = app_handle;
         std::thread::spawn(move || {
-            let sock_path = "/tmp/ooclaw-claude.sock";
+            let sock_path = "/tmp/deskmate-claude.sock";
             let _ = std::fs::remove_file(sock_path);
 
             let listener = match std::os::unix::net::UnixListener::bind(sock_path) {
@@ -12315,19 +12619,15 @@ pub fn run() {
             // Fix PATH so openclaw (Node.js script) and node are both reachable
             fix_path();
 
-            // Install Claude + Codex hooks on every startup (idempotent)
-            if let Err(e) = tauri::async_runtime::block_on(install_claude_hooks()) {
-                log::warn!("Failed to install Claude hooks on startup: {}", e);
-            }
-            // Install Cursor hooks + terminal-focus extension on startup (idempotent)
-            if let Err(e) = tauri::async_runtime::block_on(install_cursor_hooks()) {
-                log::warn!("Failed to install Cursor hooks on startup: {}", e);
-            }
+            // Hook installation is user-triggered from settings. Avoid writing
+            // Claude/Codex/Cursor config on every launch: recent macOS builds
+            // can surface repeated privacy prompts for background app changes,
+            // even when the writes are idempotent.
 
             // One log file per app run, named with a startup timestamp so we
             // never lose the previous session's logs to rotation. Goes to the
-            // OS-standard logs dir alongside the rolling `oc-claw.log`.
-            // On Windows: %LOCALAPPDATA%\com.openclaw.ooclaw\logs\run-*.log
+            // OS-standard logs dir alongside the rolling `DeskMate.log`.
+            // On Windows: %LOCALAPPDATA%\com.xiaoqiushi.deskmate\logs\run-*.log
             //
             // Drop the default Stdout target — `pnpm tauri dev` would
             // otherwise mirror every log line into the terminal, drowning
@@ -12560,7 +12860,7 @@ pub fn run() {
                 if let Some(ref sp) = store_path {
                     if let Ok(data) = std::fs::read_to_string(sp) {
                         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&data) {
-                            lang = val.get("oc-claw-lang").and_then(|v| v.as_str()).map(|s| s.to_string());
+                            lang = val.get("deskmate-lang").and_then(|v| v.as_str()).map(|s| s.to_string());
                         }
                     }
                 }
@@ -12621,7 +12921,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_status, send_chat, open_detail_panel, save_character_gif, delete_character_assets, delete_character_gif, get_agents, get_health, get_agent_metrics, interrupt_agent, scan_characters, get_agent_extra_info, open_mini, close_mini, set_mini_expanded, set_mini_size, set_efficiency_hover_tracking, resize_mini_height, move_mini_by, get_mini_origin, get_mini_monitor_rect, set_mini_origin, set_ime_mode, get_agent_sessions, get_session_preview, get_session_messages, get_active_sessions, proxy_post, play_sound, get_claude_sessions, get_claude_conversation, install_claude_hooks, install_cursor_hooks, remove_claude_session, resolve_claude_permission, get_claude_stats, open_url, activate_app, focus_cursor_terminal, check_ax_permission, request_ax_permission, jump_to_claude_terminal, check_for_update, run_update, close_ssh, read_local_file, list_backgrounds, save_background, get_background_data, exit_app, get_ssh_key_info, reset_ssh, get_ui_scale, list_custom_codex_pets, open_codex_pets_dir, import_codex_pet, pick_codex_pet_folder, reassert_floating, spawn_demo_mascot, close_demo_mascot, close_demo_mascots, debug_log, update_tray_language, set_pet_mode_window, set_pet_context_menu, set_pet_pomodoro_active, get_now_playing, get_system_idle_time])
+        .invoke_handler(tauri::generate_handler![get_status, send_chat, open_detail_panel, save_character_gif, delete_character_assets, delete_character_gif, get_agents, get_health, get_agent_metrics, interrupt_agent, scan_characters, get_agent_extra_info, open_mini, close_mini, set_mini_expanded, set_mini_size, set_efficiency_hover_tracking, resize_mini_height, move_mini_by, get_mini_origin, get_mini_monitor_rect, set_mini_origin, set_ime_mode, get_agent_sessions, get_session_preview, get_session_messages, get_active_sessions, proxy_post, play_sound, get_claude_sessions, get_claude_conversation, install_claude_hooks, install_cursor_hooks, remove_claude_session, resolve_claude_permission, get_claude_stats, open_url, show_completion_toast, hide_completion_toast, get_completion_toast_payload, open_claude_session_project, activate_app, focus_cursor_terminal, check_ax_permission, request_ax_permission, jump_to_claude_terminal, check_for_update, run_update, close_ssh, read_local_file, list_backgrounds, save_background, get_background_data, exit_app, get_ssh_key_info, reset_ssh, get_ui_scale, list_custom_codex_pets, open_codex_pets_dir, import_codex_pet, pick_codex_pet_folder, reassert_floating, spawn_demo_mascot, close_demo_mascot, close_demo_mascots, debug_log, update_tray_language, set_pet_mode_window, set_pet_context_menu, set_pet_pomodoro_active, get_now_playing, get_system_idle_time])
         .manage(ActiveAgentPid { pid: Mutex::new(None) })
         .manage(ClaudeState { sessions: Arc::new(Mutex::new(HashMap::new())), pending_permissions: Arc::new(Mutex::new(HashMap::new())) })
         .run(tauri::generate_context!())

@@ -2,7 +2,7 @@
   "platforms": {
     "macos": {
       "version": "1.8.4",
-      "url": "https://github.com/rainnoon/oc-claw/releases/download/v1.8.4/oc-claw_1.8.4_aarch64.dmg",
+      "url": "https://github.com/xiaoqiushi/DeskMate/releases/download/v1.8.4/DeskMate_1.8.4_aarch64.dmg",
       "notes_i18n": {
         "zh": "支持 Windows 上的 Cursor，双端 Claude Code Desktop，新增开机自启动",
         "en": "Cursor on Windows, Claude Code Desktop on macOS and Windows, launch-on-login",
@@ -14,7 +14,7 @@
     },
     "windows": {
       "version": "1.8.4",
-      "url": "https://github.com/rainnoon/oc-claw/releases/download/v1.8.4/oc-claw_1.8.4_x64-setup.exe",
+      "url": "https://github.com/xiaoqiushi/DeskMate/releases/download/v1.8.4/DeskMate_1.8.4_x64-setup.exe",
       "notes_i18n": {
         "zh": "支持 Windows 上的 Cursor，双端 Claude Code Desktop，新增开机自启动",
         "en": "Cursor on Windows, Claude Code Desktop on macOS and Windows, launch-on-login",

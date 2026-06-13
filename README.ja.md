@@ -1,9 +1,9 @@
 <p align="center">
   <img src="icon.png" width="80" />
 </p>
-<h1 align="center">OC-Claw</h1>
+<h1 align="center">DeskMate</h1>
 <p align="center">
-  <a href="https://www.oc-claw.ai"><img src="https://img.shields.io/badge/公式サイトからダウンロード-oc--claw.ai-8A2BE2?style=for-the-badge" alt="Download" /></a>
+  <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Download-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
   <a href="./README.md">English</a> | <a href="./README.zh.md">中文</a> | <b>日本語</b> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
@@ -54,7 +54,7 @@ Cursor          ──→ Hooks ──→ イベントパーサー ──→ 活
                   アニメスプライト ← ステートマシン ← サウンドエフェクト
 ```
 
-OC-Claw は OpenClaw のセッションファイルをポーリングしてエージェントの活動を検出し、インストールされた Hook を通じて Claude Code、Codex、Cursor をリッスンします。活動状態がノッチ島のキャラクターアニメーションを駆動し、展開パネルでセッション詳細、チャット履歴、メトリクスを表示します。
+DeskMate は OpenClaw のセッションファイルをポーリングしてエージェントの活動を検出し、インストールされた Hook を通じて Claude Code、Codex、Cursor をリッスンします。活動状態がノッチ島のキャラクターアニメーションを駆動し、展開パネルでセッション詳細、チャット履歴、メトリクスを表示します。
 
 ## 技術スタック
 

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "oc-claw",
+  "productName": "DeskMate",
   "version": "1.8.4",
-  "identifier": "com.openclaw.ooclaw",
+  "identifier": "com.xiaoqiushi.deskmate",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5222",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "mini",
-        "title": "oc-claw Mini",
+        "title": "DeskMate Mini",
         "width": 60,
         "height": 45,
         "x": -9999,

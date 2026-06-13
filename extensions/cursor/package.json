@@ -1,9 +1,9 @@
 {
   "name": "terminal-focus",
-  "displayName": "oc-claw Terminal Focus",
-  "description": "Enables precise window and terminal focusing for oc-claw desktop pet",
+  "displayName": "DeskMate Terminal Focus",
+  "description": "Enables precise window and terminal focusing for DeskMate desktop pet",
   "version": "1.0.0",
-  "publisher": "oc-claw",
+  "publisher": "deskmate",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"

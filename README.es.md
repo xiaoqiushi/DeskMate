@@ -1,9 +1,9 @@
 <p align="center">
   <img src="icon.png" width="80" />
 </p>
-<h1 align="center">OC-Claw</h1>
+<h1 align="center">DeskMate</h1>
 <p align="center">
-  <a href="https://www.oc-claw.ai"><img src="https://img.shields.io/badge/Descargar_desde-oc--claw.ai-8A2BE2?style=for-the-badge" alt="Download" /></a>
+  <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Descargar-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
   <a href="./README.md">English</a> | <a href="./README.zh.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <b>Español</b> | <a href="./README.fr.md">Français</a>
@@ -54,7 +54,7 @@ Cursor          ──→ Hooks ──→ Parser de eventos ──→ Estado de 
                       Sprites animados ← Máquina de estados ← Efectos de sonido
 ```
 
-OC-Claw sondea los archivos de sesión de OpenClaw para detectar actividad de agentes, y escucha Claude Code, Codex y Cursor mediante hooks instalados. Los estados de actividad impulsan las animaciones de personajes en la isla del notch, con un panel expandible para detalles de sesión, historial de chat y métricas.
+DeskMate sondea los archivos de sesión de OpenClaw para detectar actividad de agentes, y escucha Claude Code, Codex y Cursor mediante hooks instalados. Los estados de actividad impulsan las animaciones de personajes en la isla del notch, con un panel expandible para detalles de sesión, historial de chat y métricas.
 
 ## Stack Tecnológico
 

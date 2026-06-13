@@ -478,6 +478,40 @@ export default function Mini() {
     [resolveClaudeStatsSource],
   )
 
+  const openClaudeSessionEditor = useCallback((session: any) => {
+    if (!session?.sessionId) return
+    if (session.source === 'cursor') {
+      invoke('focus_cursor_terminal', { sessionId: session.sessionId }).catch((err: unknown) => console.warn('focus cursor failed:', err))
+    } else {
+      invoke('jump_to_claude_terminal', { sessionId: session.sessionId }).catch((err: unknown) => console.warn('jump failed:', err))
+    }
+  }, [])
+
+  const openClaudeSessionProject = useCallback((session: any) => {
+    if (!session?.sessionId || !session?.cwd) return
+    invoke('open_claude_session_project', { sessionId: session.sessionId }).catch((err: unknown) => console.warn('open project failed:', err))
+  }, [])
+
+  const showCompletionToast = useCallback((session: any) => {
+    if (!session?.sessionId) return
+    const fallbackProjectName = session.cwd ? String(session.cwd).split('/').pop() || 'unknown' : 'unknown'
+    const sessionIndex = claudeSessionsRef.current.findIndex((s) => s.sessionId === session.sessionId)
+    const toastPet = getQueuePet(sessionIndex >= 0 ? sessionIndex : 0)
+    invoke('show_completion_toast', {
+      payload: {
+        sessionId: session.sessionId,
+        source: session.source || 'cc',
+        projectName: sessionNicknames[session.sessionId] || fallbackProjectName,
+        cwd: session.cwd || '',
+        userPrompt: session.userPrompt || '',
+        lastResponse: session.lastResponse || '',
+        updatedAt: session.updatedAt || Date.now(),
+        autoClose: autoCloseCompletionRef.current,
+        pet: toastPet,
+      },
+    }).catch((err: unknown) => console.warn('show completion toast failed:', err))
+  }, [getQueuePet, sessionNicknames])
+
   const isWindowsPlatform = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
 
   // Feature toggles
@@ -2114,7 +2148,7 @@ export default function Mini() {
     // Track which sessions already had lastResponse so we only auto-expand once.
     const seenCompletions = new Set<string>()
     // Track previously logged session statuses so we only emit a backend log
-    // line when something actually changes — keeps oc-claw.log readable.
+    // line when something actually changes — keeps DeskMate.log readable.
     const lastLoggedStatus = new Map<string, string>()
     const poll = async () => {
       try {
@@ -2155,14 +2189,14 @@ export default function Mini() {
             }
           } catch {}
         }
-        // In efficiency mode, auto-expand panel when a session just completed
-        // with an AI response (lastResponse appeared for the first time).
-        // Mark all newly completed sessions as seen, but only auto-expand
-        // if the session's terminal tab is not currently active.
+        // In efficiency mode, notify when a session just completed with an
+        // AI response (lastResponse appeared for the first time). Completion
+        // no longer auto-expands the top panel; it records the detail for
+        // manual viewing and shows a separate top-right toast instead.
         for (const s of sessions) {
           if (s.lastResponse && s.status === 'stopped' && !seenCompletions.has(s.sessionId)) {
             seenCompletions.add(s.sessionId)
-            // Only auto-expand if tab not active and panel is collapsed
+            // Only notify if tab not active and panel is collapsed
             if (
               autoExpandOnTaskRef.current &&
               !updateModalOpenRef.current &&
@@ -2172,9 +2206,7 @@ export default function Mini() {
               !expandingRef.current &&
               !collapsingRef.current
             ) {
-              hoverExpandedRef.current = true
-              setCompletionSessionId(s.sessionId)
-              expandFnRef.current?.()
+              showCompletionToast(s)
             }
           }
         }
@@ -2192,7 +2224,7 @@ export default function Mini() {
     poll()
     const t = setInterval(poll, 2000)
     return () => clearInterval(t)
-  }, [enableClaudeCode, enableClaudeDesktop, enableCodex, enableCursor, appMode])
+  }, [enableClaudeCode, enableClaudeDesktop, enableCodex, enableCursor, appMode, showCompletionToast])
 
   // Listen for Claude/Codex/Cursor task completion → play sound
   const soundEnabledRef = useRef(soundEnabled)
@@ -2229,12 +2261,9 @@ export default function Mini() {
       // muted streams never trigger auto-expand or completion popups either.
       if (isClaudeDesktop && !enableClaudeDesktopRef.current) return
       if (isClaudeCli && !enableClaudeCodeRef.current) return
-      if (ev.payload?.waiting && viewModeRef.current === 'efficiency' && autoExpandOnTaskRef.current) {
-        setEffListCollapsed(true)
-        if (!expandedRef.current && expandFnRef.current) {
-          expandFnRef.current()
-        }
-      }
+      // Waiting/permission events must not auto-open the top panel. The
+      // permission card remains available when the user opens the panel
+      // manually, but background work should not interrupt the current app.
       const shouldSound = isCursor ? cursorSoundEnabledRef.current : isCodex ? codexSoundEnabledRef.current : soundEnabledRef.current
       if (!shouldSound) return
       if (ev.payload?.waiting && !waitingSoundRef.current) return
@@ -4190,7 +4219,7 @@ export default function Mini() {
                 }}
                 onStar={() => {
                   closePetContextMenu()
-                  invoke('open_url', { url: 'https://github.com/rainnoon/oc-claw' }).catch(() => {})
+                  invoke('open_url', { url: 'https://github.com/xiaoqiushi/DeskMate' }).catch(() => {})
                 }}
                 onFoodRain={triggerFoodRain}
                 onPlayAudio={playPetAudio}
@@ -4701,17 +4730,13 @@ export default function Mini() {
                                     exit={{ opacity: 0, filter: 'blur(4px)' }}
                                     transition={{ duration: 0.2, delay: index * 0.05 }}
                                     data-no-drag
-                                    onClick={() => {
-                                      if (!isWaiting) {
-                                        if (cs.source === 'cursor') {
-                                          invoke('focus_cursor_terminal', { sessionId: cs.sessionId }).catch((err: unknown) => console.warn('focus cursor failed:', err))
-                                        } else {
-                                          invoke('jump_to_claude_terminal', { sessionId: cs.sessionId }).catch((err: unknown) => console.warn('jump failed:', err))
-                                        }
-                                      }
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation()
+                                      openClaudeSessionEditor(cs)
                                     }}
-                                    className={`group hover:bg-white/[0.04] transition-colors ${isWaiting ? '' : 'cursor-pointer'}`}
+                                    className="group hover:bg-white/[0.04] transition-colors cursor-pointer"
                                     style={{ padding: '10px 16px' }}
+                                    title={t('mini.openEditor', '查看编辑器')}
                                   >
                                     <div className="flex min-w-0 w-full items-center gap-3">
                                       {showCharGif && (
@@ -4925,7 +4950,7 @@ export default function Mini() {
                                               collapse()
                                             }
                                             // Codex approval should be made in Codex's own UI.
-                                            // oc-claw only surfaces a reminder and a jump action
+                                            // DeskMate only surfaces a reminder and a jump action
                                             // so the user can approve there.
                                             if (cs.source === 'codex') {
                                               return (
@@ -5010,18 +5035,17 @@ export default function Mini() {
                                        点击跳转到对应终端。
                                        只有刚完成的 session 才展开弹窗，其余已完成的只显示标题行。 */}
                                     {!isWaiting && !isWorking && cs.lastResponse && completionSessionId === cs.sessionId && (
-                                      <div data-no-drag className="mt-2 rounded-lg bg-[#1a1a1e] border border-[#2a2a2e] overflow-hidden">
+                                      <div
+                                        data-no-drag
+                                        className="mt-2 rounded-lg bg-[#1a1a1e] border border-[#2a2a2e] overflow-hidden cursor-pointer hover:bg-[#1d1d21] transition-colors"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setCompletionSessionId(null)
+                                          openClaudeSessionEditor(cs)
+                                        }}
+                                      >
                                         <div
-                                          className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2e] cursor-pointer hover:bg-[#222226] transition-colors"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            setCompletionSessionId(null)
-                                            if (cs.source === 'cursor') {
-                                              invoke('focus_cursor_terminal', { sessionId: cs.sessionId }).catch((err: unknown) => console.warn('focus cursor failed:', err))
-                                            } else {
-                                              invoke('jump_to_claude_terminal', { sessionId: cs.sessionId }).catch(() => {})
-                                            }
-                                          }}
+                                          className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2e]"
                                         >
                                           <span className="text-[12px] text-slate-300 truncate">
                                             {cs.userPrompt ? (
@@ -5045,6 +5069,31 @@ export default function Mini() {
                                           ) : (
                                             <ReactMarkdown>{cs.lastResponse}</ReactMarkdown>
                                           )}
+                                        </div>
+                                        <div className="flex justify-end gap-2 px-3 py-2 border-t border-[#2a2a2e]">
+                                          {cs.cwd && (
+                                            <button
+                                              data-no-drag
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                openClaudeSessionProject(cs)
+                                              }}
+                                              className="px-2.5 py-1 rounded-md text-[11px] font-normal bg-[#27272a] text-slate-300 hover:bg-[#303033] transition-colors"
+                                            >
+                                              {t('mini.openProject', '打开项目')}
+                                            </button>
+                                          )}
+                                          <button
+                                            data-no-drag
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setCompletionSessionId(null)
+                                              openClaudeSessionEditor(cs)
+                                            }}
+                                            className="px-2.5 py-1 rounded-md text-[11px] font-normal bg-emerald-900/50 text-emerald-300 hover:bg-emerald-800/50 transition-colors"
+                                          >
+                                            {t('mini.openEditor', '查看编辑器')}
+                                          </button>
                                         </div>
                                       </div>
                                     )}
@@ -5091,7 +5140,7 @@ export default function Mini() {
                       <div className="mt-auto py-0.5 flex justify-center items-center select-none opacity-30 hover:opacity-60 transition-opacity">
                         <span
                           data-no-drag
-                          onClick={() => invoke('open_url', { url: 'https://github.com/rainnoon/oc-claw' })}
+                          onClick={() => invoke('open_url', { url: 'https://github.com/xiaoqiushi/DeskMate' })}
                           className="text-[8px] font-bold tracking-[0.2em] text-slate-500 uppercase cursor-pointer"
                         >
                           oc–claw
@@ -5443,7 +5492,7 @@ export default function Mini() {
                       <div className="mt-auto pt-1.5 pb-1 flex justify-center items-center select-none">
                         <span
                           data-no-drag
-                          onClick={() => invoke('open_url', { url: 'https://github.com/rainnoon/oc-claw' })}
+                          onClick={() => invoke('open_url', { url: 'https://github.com/xiaoqiushi/DeskMate' })}
                           className="text-[10px] font-black tracking-[0.25em] text-slate-500 uppercase cursor-pointer hover:text-slate-300 transition-colors"
                         >
                           oc–claw.ai
@@ -5838,7 +5887,7 @@ export default function Mini() {
                   }}
                 >
                   <span
-                    onClick={() => invoke('open_url', { url: 'https://github.com/rainnoon/oc-claw' })}
+                    onClick={() => invoke('open_url', { url: 'https://github.com/xiaoqiushi/DeskMate' })}
                     style={{
                       color: 'rgba(255,255,255,0.35)',
                       fontSize: 11,

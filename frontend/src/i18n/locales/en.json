@@ -170,7 +170,7 @@
 
     "system": "System",
     "autostart": "Launch on Login",
-    "autostartDesc": "Start oc-claw automatically when you log in",
+    "autostartDesc": "Start DeskMate automatically when you log in",
     "autostartFailed": "Failed to update autostart:",
 
     "about": "About",

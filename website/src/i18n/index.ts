@@ -14,7 +14,7 @@ export const langLabels: Record<Lang, string> = {
 
 export const ui = {
   en: {
-    'site.title': 'OC-Claw — Desktop Pet for AI Coding Agents',
+    'site.title': 'DeskMate — Desktop Pet for AI Coding Agents',
     'site.description': 'A desktop pet that monitors your AI coding agents — OpenClaw, Claude Code, Codex, and Cursor — in real time. Supports macOS and Windows.',
     'hero.tagline': 'A desktop pet that monitors your AI coding agents in real time.',
     'hero.tagline.win': 'A desktop pet that monitors your AI coding agents in real time.',
@@ -33,7 +33,7 @@ export const ui = {
     'schema.os': 'macOS, Windows',
   },
   zh: {
-    'site.title': 'OC-Claw — AI 编程 Agent 桌面宠物',
+    'site.title': 'DeskMate — AI 编程 Agent 桌面宠物',
     'site.description': '桌面宠物应用，实时监控你的 AI 编程 agent 工作状态。支持 macOS 和 Windows。',
     'hero.tagline': '桌面宠物应用，实时监控你的 AI 编程 agent 工作状态。',
     'hero.tagline.win': '桌面宠物应用，实时监控你的 AI 编程 agent 工作状态。',
@@ -52,7 +52,7 @@ export const ui = {
     'schema.os': 'macOS, Windows',
   },
   ja: {
-    'site.title': 'OC-Claw — AIコーディングエージェント用デスクトップペット',
+    'site.title': 'DeskMate — AIコーディングエージェント用デスクトップペット',
     'site.description': 'AIコーディングエージェント（OpenClaw、Claude Code、Codex、Cursor）をリアルタイムで監視するデスクトップペット。macOSとWindowsに対応。',
     'hero.tagline': 'AIコーディングエージェントをリアルタイムで監視するデスクトップペット。',
     'hero.tagline.win': 'AIコーディングエージェントをリアルタイムで監視するデスクトップペット。',
@@ -71,7 +71,7 @@ export const ui = {
     'schema.os': 'macOS, Windows',
   },
   ko: {
-    'site.title': 'OC-Claw — AI 코딩 에이전트 데스크톱 펫',
+    'site.title': 'DeskMate — AI 코딩 에이전트 데스크톱 펫',
     'site.description': 'AI 코딩 에이전트(OpenClaw, Claude Code, Codex, Cursor)를 실시간으로 모니터링하는 데스크톱 펫. macOS와 Windows 지원.',
     'hero.tagline': 'AI 코딩 에이전트를 실시간으로 모니터링하는 데스크톱 펫.',
     'hero.tagline.win': 'AI 코딩 에이전트를 실시간으로 모니터링하는 데스크톱 펫.',
@@ -90,7 +90,7 @@ export const ui = {
     'schema.os': 'macOS, Windows',
   },
   es: {
-    'site.title': 'OC-Claw — Mascota de Escritorio para Agentes de Código IA',
+    'site.title': 'DeskMate — Mascota de Escritorio para Agentes de Código IA',
     'site.description': 'Una mascota de escritorio que monitorea tus agentes de código IA — OpenClaw, Claude Code, Codex y Cursor — en tiempo real. Compatible con macOS y Windows.',
     'hero.tagline': 'Una mascota de escritorio que monitorea tus agentes de código IA en tiempo real.',
     'hero.tagline.win': 'Una mascota de escritorio que monitorea tus agentes de código IA en tiempo real.',
@@ -109,7 +109,7 @@ export const ui = {
     'schema.os': 'macOS, Windows',
   },
   fr: {
-    'site.title': 'OC-Claw — Animal de Bureau pour Agents de Code IA',
+    'site.title': 'DeskMate — Animal de Bureau pour Agents de Code IA',
     'site.description': 'Un animal de bureau qui surveille vos agents de code IA — OpenClaw, Claude Code, Codex et Cursor — en temps réel. Compatible macOS et Windows.',
     'hero.tagline': 'Un animal de bureau qui surveille vos agents de code IA en temps réel.',
     'hero.tagline.win': 'Un animal de bureau qui surveille vos agents de code IA en temps réel.',

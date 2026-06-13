@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://oc-claw.vercel.app/sitemap-index.xml
+Sitemap: https://DeskMate.vercel.app/sitemap-index.xml

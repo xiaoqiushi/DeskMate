@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-REPO="rainnoon/oc-claw"
-APP_NAME="oc-claw"
+REPO="xiaoqiushi/DeskMate"
+APP_NAME="DeskMate"
 INSTALL_DIR="/Applications"
 
 echo "Installing ${APP_NAME}..."

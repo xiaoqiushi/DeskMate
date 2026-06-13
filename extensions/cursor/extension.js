@@ -3,7 +3,7 @@ const path = require('path');
 const vscode = require('vscode');
 
 // Each Cursor window gets its own extension host, so each window needs
-// a dedicated localhost port. oc-claw uses this to bind a session to a
+// a dedicated localhost port. DeskMate uses this to bind a session to a
 // specific Cursor window instead of broadcasting to every window forever.
 const PORT_BASE = 23456;
 const PORT_RANGE = 5;
@@ -110,7 +110,7 @@ async function focusTerminalByPids(pids) {
 
 function tryListen(port, maxPort) {
     if (port > maxPort) {
-        console.log('oc-claw terminal-focus: all ports in use, HTTP server disabled');
+        console.log('DeskMate terminal-focus: all ports in use, HTTP server disabled');
         return;
     }
 
@@ -171,7 +171,7 @@ function tryListen(port, maxPort) {
 
     server.listen(port, '127.0.0.1', () => {
         boundPort = port;
-        console.log(`oc-claw terminal-focus: listening on 127.0.0.1:${port}`);
+        console.log(`DeskMate terminal-focus: listening on 127.0.0.1:${port}`);
     });
 }
 

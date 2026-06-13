@@ -151,7 +151,7 @@
 
     "system": "시스템",
     "autostart": "로그인 시 실행",
-    "autostartDesc": "로그인할 때 oc-claw를 자동으로 시작합니다",
+    "autostartDesc": "로그인할 때 DeskMate를 자동으로 시작합니다",
     "autostartFailed": "자동 시작 설정 실패:",
 
     "about": "정보",

@@ -1,8 +1,8 @@
 [package]
-name = "oc_claw"
+name = "deskmate"
 version = "1.8.4"
-description = "OpenClaw Desktop Pet"
-authors = ["you"]
+description = "Desktop companion for AI coding agents"
+authors = ["xiaoqiushi"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.77.2"

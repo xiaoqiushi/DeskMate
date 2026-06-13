@@ -1,9 +1,9 @@
 <p align="center">
   <img src="icon.png" width="80" />
 </p>
-<h1 align="center">OC-Claw</h1>
+<h1 align="center">DeskMate</h1>
 <p align="center">
-  <a href="https://www.oc-claw.ai"><img src="https://img.shields.io/badge/Télécharger_depuis-oc--claw.ai-8A2BE2?style=for-the-badge" alt="Download" /></a>
+  <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Télécharger-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
   <a href="./README.md">English</a> | <a href="./README.zh.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <b>Français</b>
@@ -54,7 +54,7 @@ Cursor          ──→ Hooks ──→ Parseur d'événements ──→ État
                      Sprites animés ← Machine à états ← Effets sonores
 ```
 
-OC-Claw sonde les fichiers de session OpenClaw pour détecter l'activité des agents, et écoute Claude Code, Codex et Cursor via les hooks installés. Les états d'activité pilotent les animations de personnages sur l'île de l'encoche, avec un panneau extensible pour les détails de session, l'historique des conversations et les métriques.
+DeskMate sonde les fichiers de session OpenClaw pour détecter l'activité des agents, et écoute Claude Code, Codex et Cursor via les hooks installés. Les états d'activité pilotent les animations de personnages sur l'île de l'encoche, avec un panneau extensible pour les détails de session, l'historique des conversations et les métriques.
 
 ## Stack Technique
 

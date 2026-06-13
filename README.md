@@ -1,9 +1,9 @@
 <p align="center">
   <img src="icon.png" width="80" />
 </p>
-<h1 align="center">OC-Claw</h1>
+<h1 align="center">DeskMate</h1>
 <p align="center">
-  <a href="https://www.oc-claw.ai"><img src="https://img.shields.io/badge/Download_OC--Claw-oc--claw.ai-8A2BE2?style=for-the-badge" alt="Download" /></a>
+  <a href="https://github.com/xiaoqiushi/DeskMate"><img src="https://img.shields.io/badge/Download-DeskMate-8A2BE2?style=for-the-badge" alt="Download" /></a>
 </p>
 <p align="center">
   <b>English</b> | <a href="./README.zh.md">中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.es.md">Español</a> | <a href="./README.fr.md">Français</a>
@@ -54,7 +54,7 @@ Cursor          ──→ Hooks ──→ Event parser ──→ Activity state
                     Animated sprites ← State machine ← Sound effects
 ```
 
-OC-Claw polls OpenClaw session files to detect agent activity, and listens to Claude Code, Codex, and Cursor via installed hooks. Activity states drive character animations on the notch island, with an expandable panel for session details, chat history, and metrics.
+DeskMate polls OpenClaw session files to detect agent activity, and listens to Claude Code, Codex, and Cursor via installed hooks. Activity states drive character animations on the notch island, with an expandable panel for session details, chat history, and metrics.
 
 ## Tech Stack
 
